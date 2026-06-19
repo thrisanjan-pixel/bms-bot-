@@ -32,14 +32,14 @@ MOVIES = [
         "code": "ET00502600",
         "slug": "spider-man-brand-new-day",
         "start_date": "20260730",  
-        "days_to_track": 5         
+        "days_to_track": 3         # Optimized tracking horizon to save trial balance
     },
     {
         "name": "Supergirl",
         "code": "ET00475569",
         "slug": "supergirl",
         "start_date": "20260626",  
-        "days_to_track": 5         
+        "days_to_track": 3         # Optimized tracking horizon to save trial balance
     }
 ]
 
@@ -74,7 +74,7 @@ def log(msg: str):
 
 def get_dates_to_track(movie: dict) -> list:
     start_str = movie["start_date"]
-    days = movie.get("days_to_track", 5)
+    days = movie.get("days_to_track", 3)
     start_dt = datetime.datetime.strptime(start_str, "%Y%m%d")
     today_now = datetime.datetime.now()
     today_dt = datetime.datetime(today_now.year, today_now.month, today_now.day)
@@ -264,12 +264,12 @@ async def fetch_theaters_via_api(session: AsyncSession, api_url: str, page_url: 
 
 
 async def get_current_theaters(session: AsyncSession, page_url: str, api_url: str) -> tuple:
-    # 1. Try raw server connection first (fastest)
+    # 1. Try raw server connection first (fastest and free)
     status, theaters = await fetch_theaters_via_api(session, api_url, page_url)
     if status in ("OK", "NOT_LIVE"):
         return status, theaters
 
-    # 2. If server is blocked, immediately cleanly pass to your premium residential channel
+    # 2. If blocked, route traffic through your custom premium residential tunnel
     log("  ↳ Direct server signature rejected. Engaging Premium Residential Tunnel...")
     return await fetch_theaters_via_premium_proxy(api_url, page_url)
 
