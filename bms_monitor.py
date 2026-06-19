@@ -43,7 +43,7 @@ MOVIES = [
         "name": "The Odyssey",
         "code": "ET00452034",
         "slug": "the-odyssey",
-        "start_date": "20260626",  
+        "start_date": "20260717",  # Updated release date
         "days_to_track": 3         
     }
 ]
@@ -96,13 +96,11 @@ def get_urls(movie: dict, date: str) -> tuple:
 
 # ─── PROXY GATEWAY GENERATORS ─────────────────────────────────────────────
 def get_mobile_proxy_url() -> str:
-    """Generates a dynamic 12-char cellular session endpoint"""
     rand_session = "".join(random.choices(string.digits + "abcdef", k=12))
     username = f"on0xutsx1n-corp.mobile.res-country-IN-hold-session-session-{rand_session}"
     return f"http://{username}:SiGyraQjeRR7Y1tG@109.236.82.42:443"
 
 def get_residential_proxy_url() -> str:
-    """Generates a dynamic 4-char residential back-up endpoint"""
     rand_session = "".join(random.choices(string.ascii_letters + string.digits, k=4))
     username = f"asdasda-zone-resi-region-IN-st--city--session-{rand_session}-sessionTime-10"
     return f"http://{username}:asdasdasd@southasia.a1proxy.com:15122"
@@ -110,7 +108,6 @@ def get_residential_proxy_url() -> str:
 
 
 async def fetch_with_proxy(api_url: str, page_url: str, proxy_type: str) -> tuple:
-    """Executes a target request using the chosen premium endpoint configuration"""
     proxy_endpoint = get_mobile_proxy_url() if proxy_type == "MOBILE" else get_residential_proxy_url()
     cfg = random.choice(HEADER_CONFIGS)
     
@@ -287,7 +284,6 @@ async def get_current_theaters(session: AsyncSession, page_url: str, api_url: st
 
 
 async def process_movie_date(session: AsyncSession, semaphore: asyncio.Semaphore, movie: dict, target_date: str) -> bool:
-    """Returns True if the check succeeded, False if it was an absolute error failure"""
     async with semaphore:
         await asyncio.sleep(random.uniform(0.2, 1.0))
         page_url, _, api_url = get_urls(movie, target_date)
@@ -304,7 +300,6 @@ async def process_movie_date(session: AsyncSession, semaphore: asyncio.Semaphore
                 if is_first_run:
                     log(f"      📥 [Silent Init] Cached baseline grid snapshot ({len(current_theaters)} nodes) for {movie['name']}.")
                 else:
-                    # TRIGGER ALERT ON TICKET SEAT OPENINGS
                     theater_list = "\n".join(f"• {t}" for t in sorted(new_theaters))
                     alert_msg = (
                         f"🚨🎬 <b>NEW CHANNELS OPENED ON {target_date}!</b>\n\n"
@@ -333,7 +328,6 @@ async def main_async():
     log(f"   Multi-tier Mobile and Residential backup cluster online.")
     log("=" * 60)
 
-    # Startup verification email alert block with direct embedded links
     for movie in MOVIES:
         movie_name = movie["name"]
         dates_to_track = get_dates_to_track(movie)
@@ -364,12 +358,10 @@ async def main_async():
         
         results = await asyncio.gather(*tasks)
         
-        # Check if all dates in the matrix sweep failed completely
         if results and all(res is False for res in results):
             consecutive_failures += 1
             log(f"⚠️ Entire matrix sweep missed. Consecutive failure counter: {consecutive_failures}/5")
             
-            # TRIGGER EMAIL WHEN BOT FAILS (5 consecutive full failures)
             if consecutive_failures >= 5:
                 fail_alert = (
                     f"⚠️ <b>CRITICAL: BMS MONITOR DAEMON FALLING BACK!</b>\n\n"
