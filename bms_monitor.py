@@ -32,14 +32,14 @@ MOVIES = [
         "code": "ET00502600",
         "slug": "spider-man-brand-new-day",
         "start_date": "20260730",  
-        "days_to_track": 3         
+        "days_to_track": 3         # Optimized tracking horizon to save trial balance
     },
     {
         "name": "Supergirl",
         "code": "ET00475569",
         "slug": "supergirl",
         "start_date": "20260626",  
-        "days_to_track": 3         
+        "days_to_track": 3         # Optimized tracking horizon to save trial balance
     }
 ]
 
@@ -91,11 +91,13 @@ def get_urls(movie: dict, date: str) -> tuple:
 
 # ─── PROXY GATEWAY GENERATORS ─────────────────────────────────────────────
 def get_mobile_proxy_url() -> str:
+    """Generates a dynamic 12-char cellular session endpoint"""
     rand_session = "".join(random.choices(string.digits + "abcdef", k=12))
     username = f"on0xutsx1n-corp.mobile.res-country-IN-hold-session-session-{rand_session}"
     return f"http://{username}:SiGyraQjeRR7Y1tG@109.236.82.42:443"
 
 def get_residential_proxy_url() -> str:
+    """Generates a dynamic 4-char residential back-up endpoint"""
     rand_session = "".join(random.choices(string.ascii_letters + string.digits, k=4))
     username = f"asdasda-zone-resi-region-IN-st--city--session-{rand_session}-sessionTime-10"
     return f"http://{username}:asdasdasd@southasia.a1proxy.com:15122"
@@ -103,6 +105,7 @@ def get_residential_proxy_url() -> str:
 
 
 async def fetch_with_proxy(api_url: str, page_url: str, proxy_type: str) -> tuple:
+    """Executes a target request using the chosen premium endpoint configuration"""
     proxy_endpoint = get_mobile_proxy_url() if proxy_type == "MOBILE" else get_residential_proxy_url()
     cfg = random.choice(HEADER_CONFIGS)
     
@@ -296,7 +299,7 @@ async def process_movie_date(session: AsyncSession, semaphore: asyncio.Semaphore
                 if is_first_run:
                     log(f"      📥 [Silent Init] Cached baseline grid snapshot ({len(current_theaters)} nodes) for {movie['name']}.")
                 else:
-                    # TRIGGER EMAIL AND TELEGRAM ON TICKET SEAT OPENINGS
+                    # TRIGGER ALERT ON TICKET SEAT OPENINGS
                     theater_list = "\n".join(f"• {t}" for t in sorted(new_theaters))
                     alert_msg = (
                         f"🚨🎬 <b>NEW CHANNELS OPENED ON {target_date}!</b>\n\n"
@@ -325,16 +328,19 @@ async def main_async():
     log(f"   Multi-tier Mobile and Residential backup cluster online.")
     log("=" * 60)
 
-    # Startup verification email alert block
+    # Startup verification email alert block with direct embedded links
     for movie in MOVIES:
         movie_name = movie["name"]
         dates_to_track = get_dates_to_track(movie)
+        page_url, _, _ = get_urls(movie, dates_to_track[0])
         readable_dates = ", ".join([datetime.datetime.strptime(d, "%Y%m%d").strftime("%b %d") for d in dates_to_track])
+        
         startup_alert = (
             f"🚀 <b>BMS Dual-Premium Monitor Online!</b>\n\n"
             f"🎬 <b>Movie:</b> {movie_name}\n"
             f"📅 <b>Horizon Map:</b> {readable_dates}\n\n"
-            f"🛡️ Multi-tier failover cluster engaged and routing cleanly."
+            f"🛡️ Multi-tier failover cluster engaged and routing cleanly.\n\n"
+            f"👉 <a href='{page_url}'>OPEN BOOKING PAGE →</a>"
         )
         await notify(startup_alert, email_subject=f"🚀 BMS Failover Monitor Online: {movie_name}")
 
@@ -353,7 +359,6 @@ async def main_async():
         
         results = await asyncio.gather(*tasks)
         
-        # Check if all dates in the matrix sweep failed completely
         if results and all(res is False for res in results):
             consecutive_failures += 1
             log(f"⚠️ Entire matrix sweep missed. Consecutive failure counter: {consecutive_failures}/5")
@@ -367,9 +372,9 @@ async def main_async():
                     f"💡 <b>Action Required:</b> Please log into your proxy panel dashboards and check if your 200MB trial traffic caps have been exhausted."
                 )
                 await notify(fail_alert, email_subject="⚠️ CRITICAL ERROR: BMS Tracker Daemon Failing")
-                consecutive_failures = 0  # Reset counter after alert to avoid flooding your inbox
+                consecutive_failures = 0  
         else:
-            consecutive_failures = 0  # Reset cleanly if any network check succeeds
+            consecutive_failures = 0  
             
         await asyncio.sleep(BASE_CHECK_INTERVAL + random.randint(5, 15))
 
