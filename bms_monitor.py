@@ -8,8 +8,6 @@ import string
 import asyncio
 import traceback
 from curl_cffi.requests import AsyncSession
-from curl_cffi import requests as sync_curl
-from bs4 import BeautifulSoup
 
 # ──────────────────────────────────────────────────────────
 #  CONFIG — reads from Railway env vars if set
@@ -123,10 +121,11 @@ async def fetch_with_proxy(api_url: str, page_url: str, proxy_type: str) -> tupl
     
     try:
         async with AsyncSession(impersonate="chrome110") as session:
+            # FIX: Swapped to single string 'proxy' property required by curl_cffi
             resp = await session.get(
                 api_url,
                 headers=api_headers,
-                proxies={"http": proxy_endpoint, "https": proxy_endpoint},
+                proxy=proxy_endpoint,
                 timeout=7
             )
             if resp.status_code == 200:
@@ -359,6 +358,7 @@ async def main_async():
         
         results = await asyncio.gather(*tasks)
         
+        # Check if all dates in the matrix sweep failed completely
         if results and all(res is False for res in results):
             consecutive_failures += 1
             log(f"⚠️ Entire matrix sweep missed. Consecutive failure counter: {consecutive_failures}/5")
