@@ -121,7 +121,7 @@ async def fetch_with_proxy(api_url: str, page_url: str, proxy_type: str) -> tupl
     
     try:
         async with AsyncSession(impersonate="chrome110") as session:
-            # FIX: Swapped to single string 'proxy' property required by curl_cffi
+            # Verified singular property assignment matching structural standard
             resp = await session.get(
                 api_url,
                 headers=api_headers,
