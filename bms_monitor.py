@@ -32,14 +32,14 @@ MOVIES = [
         "code": "ET00502600",
         "slug": "spider-man-brand-new-day",
         "start_date": "20260730",  
-        "days_to_track": 3         # Optimized tracking horizon to save trial balance
+        "days_to_track": 3         
     },
     {
         "name": "Supergirl",
         "code": "ET00475569",
         "slug": "supergirl",
         "start_date": "20260626",  
-        "days_to_track": 3         # Optimized tracking horizon to save trial balance
+        "days_to_track": 3         
     }
 ]
 
@@ -96,17 +96,24 @@ def get_urls(movie: dict, date: str) -> tuple:
     return page_url, info_page_url, api_url
 
 
-# ─── DYNAMIC PREMIUM RESIDENTIAL GATEWAY ──────────────────────────────────
-def get_premium_proxy_url() -> str:
-    """Generates a unique background residential session IP on every call"""
+# ─── PROXY GATEWAY GENERATORS ─────────────────────────────────────────────
+def get_mobile_proxy_url() -> str:
+    """Generates a dynamic 12-char cellular session endpoint"""
+    rand_session = "".join(random.choices(string.digits + "abcdef", k=12))
+    username = f"on0xutsx1n-corp.mobile.res-country-IN-hold-session-session-{rand_session}"
+    return f"http://{username}:SiGyraQjeRR7Y1tG@109.236.82.42:443"
+
+def get_residential_proxy_url() -> str:
+    """Generates a dynamic 4-char residential back-up endpoint"""
     rand_session = "".join(random.choices(string.ascii_letters + string.digits, k=4))
     username = f"asdasda-zone-resi-region-IN-st--city--session-{rand_session}-sessionTime-10"
     return f"http://{username}:asdasdasd@southasia.a1proxy.com:15122"
 # ──────────────────────────────────────────────────────────────────────────
 
 
-async def fetch_theaters_via_premium_proxy(api_url: str, page_url: str) -> tuple:
-    proxy_endpoint = get_premium_proxy_url()
+async def fetch_with_proxy(api_url: str, page_url: str, proxy_type: str) -> tuple:
+    """Executes a target request using the chosen premium endpoint configuration"""
+    proxy_endpoint = get_mobile_proxy_url() if proxy_type == "MOBILE" else get_residential_proxy_url()
     cfg = random.choice(HEADER_CONFIGS)
     
     api_headers = {
@@ -127,12 +134,13 @@ async def fetch_theaters_via_premium_proxy(api_url: str, page_url: str) -> tuple
                 api_url,
                 headers=api_headers,
                 proxies={"http": proxy_endpoint, "https": proxy_endpoint},
-                timeout=8
+                timeout=7
             )
-            log(f"  [PREMIUM-RESIDENTIAL] Routing breakthrough confirmed — Response: HTTP {resp.status_code}")
-            return _parse_api_response(resp)
-    except Exception as e:
-        log(f"  [PREMIUM-RESIDENTIAL] Connection drop on proxy lane: {e}")
+            if resp.status_code == 200:
+                log(f"  [{proxy_type}] Routing breakthrough confirmed — Response: HTTP 200")
+                return _parse_api_response(resp)
+            return "ERROR", set()
+    except Exception:
         return "ERROR", set()
 
 
@@ -264,14 +272,20 @@ async def fetch_theaters_via_api(session: AsyncSession, api_url: str, page_url: 
 
 
 async def get_current_theaters(session: AsyncSession, page_url: str, api_url: str) -> tuple:
-    # 1. Try raw server connection first (fastest and free)
+    # Tier 1: Try raw server connection first (Free lane)
     status, theaters = await fetch_theaters_via_api(session, api_url, page_url)
     if status in ("OK", "NOT_LIVE"):
         return status, theaters
 
-    # 2. If blocked, route traffic through your custom premium residential tunnel
-    log("  ↳ Direct server signature rejected. Engaging Premium Residential Tunnel...")
-    return await fetch_theaters_via_premium_proxy(api_url, page_url)
+    # Tier 2: Engage Premium Cellular Mobile Gateway
+    log("  ↳ Server IP rejected. Engaging Premium Mobile Tunnel...")
+    status, theaters = await fetch_with_proxy(api_url, page_url, "MOBILE")
+    if status in ("OK", "NOT_LIVE"):
+        return status, theaters
+
+    # Tier 3: Engage Premium Residential Backup Gateway
+    log("  ↳ Cellular lane flickered. Routing to Premium Residential Backup...")
+    return await fetch_with_proxy(api_url, page_url, "RESIDENTIAL")
 
 
 async def process_movie_date(session: AsyncSession, semaphore: asyncio.Semaphore, movie: dict, target_date: str):
@@ -310,8 +324,8 @@ async def process_movie_date(session: AsyncSession, semaphore: asyncio.Semaphore
 async def main_async():
     session = AsyncSession(impersonate="chrome110")
     log("=" * 60)
-    log(f"🎬 Premium Residential BookMyShow Monitor Running")
-    log(f"   Matrix Configuration Activated cleanly. 200MB Traffic Cap Shield Engine Active.")
+    log(f"🎬 Dual-Premium Failover BookMyShow Monitor Active")
+    log(f"   Multi-tier Mobile and Residential backup cluster online.")
     log("=" * 60)
 
     check_count = 0
