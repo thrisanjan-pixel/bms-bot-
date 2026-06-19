@@ -32,14 +32,14 @@ MOVIES = [
         "code": "ET00502600",
         "slug": "spider-man-brand-new-day",
         "start_date": "20260730",  
-        "days_to_track": 3         
+        "days_to_track": 3         # Optimized tracking horizon to save trial balance
     },
     {
         "name": "Supergirl",
         "code": "ET00475569",
         "slug": "supergirl",
         "start_date": "20260626",  
-        "days_to_track": 3         
+        "days_to_track": 3         # Optimized tracking horizon to save trial balance
     }
 ]
 
