@@ -678,7 +678,7 @@ async def main_async():
             await asyncio.gather(*info_tasks)
 
         # 2. Check Layout Grid Array Horizons Concurrently
-        semaphore = asyncio.Semaphore(3)  
+        semaphore = asyncio.Semaphore(1)  
         tasks = []
         for movie in MOVIES:
             dates_to_track = get_dates_to_track(movie)
