@@ -23,7 +23,7 @@ EMAIL_FROM      = os.environ.get("EMAIL_FROM", "onboarding@resend.dev")
 EMAIL_TO        = os.environ.get("EMAIL_TO", "thrisanjan@gmail.com")
 # ──────────────────────────────────────────────────────────
 
-CITY_CODE      = "HYD"
+CITY_CODE  = "HYD"
 BASE_CHECK_INTERVAL = 45  # Pause between complete matrix sweep loops           
 
 MOVIES = [
@@ -47,7 +47,6 @@ STATE_DIR  = os.environ.get("STATE_DIR", "/data" if os.path.isdir("/data") else 
 STATE_FILE = os.path.join(STATE_DIR, "known_theaters.json")
 
 # ─── GEO-FENCED INDIAN PROXY SOURCES ──────────────────────────────────────
-# All endpoints are strictly geo-fenced to pure HTTP endpoints inside India (country=IN)
 PROXY_SOURCES = [
     "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text&protocol=http&timeout=8000&country=IN",
     "https://proxylist.geonode.com/api/proxy-list?country=IN&protocols=http&limit=100&page=1&sort_by=lastChecked&sort_type=desc",
@@ -86,12 +85,10 @@ def get_urls(movie: dict, date: str) -> tuple:
     return page_url, info_page_url, api_url
 
 
-# ─── MULTI-SOURCE INDIAN EXTRACTOR WORKER ─────────────────────────────────
 async def _scrape_single_source(session: AsyncSession, url: str) -> list:
     try:
         resp = await session.get(url, timeout=12)
         if resp.status_code == 200:
-            # Check if source uses Geonode API structured JSON layouts
             if "geonode.com" in url:
                 try:
                     nodes = []
@@ -105,7 +102,6 @@ async def _scrape_single_source(session: AsyncSession, url: str) -> list:
                 except Exception:
                     pass
             
-            # Universal RegEx fallback scanner for raw flat text streams
             found = re.findall(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+\b", resp.text)
             return found
     except Exception:
@@ -120,11 +116,9 @@ async def get_free_proxies(force_refresh: bool = False) -> list:
     
     try:
         async with AsyncSession(impersonate="chrome110") as session:
-            # Gather fresh Indian proxies from all endpoints concurrently
             tasks = [_scrape_single_source(session, url) for url in PROXY_SOURCES]
             results = await asyncio.gather(*tasks)
             
-            # Combine and deduplicate
             master_set = set()
             for proxy_list in results:
                 master_set.update(proxy_list)
@@ -139,7 +133,6 @@ async def get_free_proxies(force_refresh: bool = False) -> list:
     except Exception as e:
         log(f"  [AGGREGATOR] Exception fetching list: {e}")
         return _proxy_cache["list"]
-# ──────────────────────────────────────────────────────────────────────────
 
 
 HEADER_CONFIGS = [
@@ -447,7 +440,7 @@ async def _test_single_proxy_worker(proxy_addr: str, api_url: str, api_headers: 
                 api_url,
                 headers=api_headers,
                 proxies={"http": proxy_url, "https": proxy_url},
-                timeout=4,  # Automatically drops laggy or offline nodes
+                timeout=5,  # Increased slightly to 5s to favor solid Indian routing
             )
             if resp.status_code == 200:
                 try:
@@ -473,13 +466,6 @@ async def fetch_theaters_via_free_proxy(api_url: str, page_url: str) -> tuple:
     if not proxies_list:
         return "ERROR", set()
 
-    # ─── FIXED CONCURRENCY TRAP ──────────────────────────────────────────────
-    # random.sample extracts a unique permutation subset of proxy locations per task
-    # to stop simultaneous date sweeps from knocking each other offline.
-    # ─────────────────────────────────────────────────────────────────────────
-    attempts = random.sample(proxies_list, min(PROXY_TRY_COUNT, len(proxies_list)))
-    log(f"  [FREE-PROXY] Racing {len(attempts)} randomized Indian proxy lanes concurrently...")
-
     cfg = random.choice(HEADER_CONFIGS)
     api_headers = {
         "x-bms-id": "IN-HYD",
@@ -493,17 +479,32 @@ async def fetch_theaters_via_free_proxy(api_url: str, page_url: str) -> tuple:
         "sec-ch-ua-platform": cfg["sec-ch-ua-platform"],
     }
 
-    # Race all selected proxy lanes at the exact same time
-    tasks = [_test_single_proxy_worker(p, api_url, api_headers) for p in attempts]
+    working_pool = list(proxies_list)
+    random.shuffle(working_pool)
     
-    for future in asyncio.as_completed(tasks):
-        result = await future
-        if result is not None:
-            clean_addr, status, theaters = result
-            log(f"  [FREE-PROXY] ✅ Verified Indian routing endpoint: {clean_addr}")
-            return status, theaters
+    # ─── TWO-ROUND EXHAUSTION TOURNAMENT ────────────────────────────────────
+    # Instead of wiping out the master cache on a single round failure, we try 
+    # two distinct sequential batches from the cache pool before giving up.
+    # ────────────────────────────────────────────────────────────────────────
+    batch_size = 25
+    for r in range(2):
+        start_idx = r * batch_size
+        end_idx = start_idx + batch_size
+        batch = working_pool[start_idx:end_idx]
+        
+        if not batch:
+            break
+            
+        log(f"  [FREE-PROXY] Round {r+1}: Racing {len(batch)} randomized Indian proxy lanes concurrently...")
+        tasks = [_test_single_proxy_worker(p, api_url, api_headers) for p in batch]
+        
+        for future in asyncio.as_completed(tasks):
+            result = await future
+            if result is not None:
+                clean_addr, status, theaters = result
+                log(f"  [FREE-PROXY] ✅ Verified Indian routing endpoint: {clean_addr}")
+                return status, theaters
     
-    await get_free_proxies(force_refresh=True)
     return "ERROR", set()
 # ──────────────────────────────────────────────────────────────────────────
 
@@ -653,7 +654,6 @@ async def main_async():
         check_count += 1
         log(f"Matrix Check #{check_count} — structure layout scanning active [CONCURRENT]")
 
-        # 1. Check Info Landing Status Pages Concurrently First
         info_tasks = []
         for movie in MOVIES:
             movie_name = movie["name"]
@@ -677,7 +677,10 @@ async def main_async():
         if info_tasks:
             await asyncio.gather(*info_tasks)
 
-        # 2. Check Layout Grid Array Horizons Concurrently
+        # ─── SEMAPHORE FIXED STAGGER ───────────────────────────────────────
+        # Restricting gate layout to 1 worker forces serial checks to preserve 
+        # distinct proxy lane execution streams and eliminate congestive blocks.
+        # ───────────────────────────────────────────────────────────────────
         semaphore = asyncio.Semaphore(1)  
         tasks = []
         for movie in MOVIES:
