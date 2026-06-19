@@ -30,14 +30,21 @@ MOVIES = [
         "code": "ET00502600",
         "slug": "spider-man-brand-new-day",
         "start_date": "20260730",  
-        "days_to_track": 3         # Optimized tracking horizon to save trial balance
+        "days_to_track": 3         
     },
     {
         "name": "Supergirl",
         "code": "ET00475569",
         "slug": "supergirl",
         "start_date": "20260626",  
-        "days_to_track": 3         # Optimized tracking horizon to save trial balance
+        "days_to_track": 3         
+    },
+    {
+        "name": "The Odyssey",
+        "code": "ET00452034",
+        "slug": "the-odyssey",
+        "start_date": "20260626",  
+        "days_to_track": 3         
     }
 ]
 
@@ -121,7 +128,6 @@ async def fetch_with_proxy(api_url: str, page_url: str, proxy_type: str) -> tupl
     
     try:
         async with AsyncSession(impersonate="chrome110") as session:
-            # Verified singular property assignment matching structural standard
             resp = await session.get(
                 api_url,
                 headers=api_headers,
