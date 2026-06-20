@@ -20,7 +20,7 @@ RESEND_API_KEY  = os.environ.get("RESEND_API_KEY", "re_caz97Ucb_FU7nSQuHaaPF9a7G
 EMAIL_FROM      = os.environ.get("EMAIL_FROM", "onboarding@resend.dev").strip()
 EMAIL_TO        = os.environ.get("EMAIL_TO", "thrisanjan@gmail.com").strip()
 
-# Dynamic Proxy Strings via Railway Env Variables (with fallback defaults and strict sanitization)
+# Dynamic Proxy Strings via Railway Env Variables (with strict trailing space and quote cleaning)
 MOBILE_PROXY_ENV = os.environ.get("MOBILE_PROXY_URL", "http://on0xutsx1n-corp.mobile.res-country-IN-hold-session-session-{session}:SiGyraQjeRR7Y1tG@109.236.82.42:443").strip().strip('"').strip("'")
 RESIDENTIAL_PROXY_ENV = os.environ.get("RESIDENTIAL_PROXY_URL", "http://asdasda-zone-resi-region-IN-st--city--session-{session}-sessionTime-10:asdasdasd@southasia.a1proxy.com:15122").strip().strip('"').strip("'")
 # ──────────────────────────────────────────────────────────
@@ -38,7 +38,7 @@ MOVIES = [
     },
     {
         "name": "Supergirl",
-        "code": "ET00501636",      # 🚨 UPDATED TO LIVE 3D TICKET CODE
+        "code": "ET00501636",      
         "slug": "supergirl",
         "start_date": "20260626",  
         "days_to_track": 3         
@@ -98,19 +98,18 @@ def get_urls(movie: dict, date: str) -> tuple:
     return page_url, info_page_url, api_url
 
 
-# ─── PROXY GATEWAY GENERATORS (Dynamically Injecting Sessions) ────────────
 def get_mobile_proxy_url() -> str:
     rand_session = "".join(random.choices(string.digits + "abcdef", k=12))
     if "{session}" in MOBILE_PROXY_ENV:
         return MOBILE_PROXY_ENV.format(session=rand_session)
     return MOBILE_PROXY_ENV
 
+
 def get_residential_proxy_url() -> str:
     rand_session = "".join(random.choices(string.ascii_letters + string.digits, k=4))
     if "{session}" in RESIDENTIAL_PROXY_ENV:
         return RESIDENTIAL_PROXY_ENV.format(session=rand_session)
     return RESIDENTIAL_PROXY_ENV
-# ──────────────────────────────────────────────────────────────────────────
 
 
 async def fetch_with_proxy(api_url: str, page_url: str, proxy_type: str) -> tuple:
@@ -137,7 +136,6 @@ async def fetch_with_proxy(api_url: str, page_url: str, proxy_type: str) -> tupl
                 proxy=proxy_endpoint,
                 timeout=7
             )
-            # Route response directly to parser to evaluate status codes accurately
             status, theaters = _parse_api_response(resp)
             if status == "OK":
                 log(f"   [{proxy_type}] Routing breakthrough confirmed — Response: HTTP 200")
@@ -262,34 +260,15 @@ def _parse_api_response(resp) -> tuple:
     return "NOT_LIVE", set()
 
 
-async def fetch_theaters_via_api(session: AsyncSession, api_url: str, page_url: str) -> tuple:
-    try:
-        api_headers = {
-            "x-bms-id": "IN-HYD",
-            "x-region-code": CITY_CODE,
-            "x-region-slug": "hyderabad",
-            "Referer": page_url,
-        }
-        resp = await session.get(api_url, headers=api_headers, timeout=10)
-        return _parse_api_response(resp)
-    except Exception:
-        return "ERROR", set()
-
-
 async def get_current_theaters(session: AsyncSession, page_url: str, api_url: str) -> tuple:
-    # Tier 1: Try raw server connection first
-    status, theaters = await fetch_theaters_via_api(session, api_url, page_url)
-    if status in ("OK", "NOT_LIVE"):
-        return status, theaters
-
-    # Tier 2: Engage Premium Cellular Mobile Gateway
-    log("  ↳ Server IP rejected. Engaging Premium Mobile Tunnel...")
+    # Tier 1: Engage Premium Cellular Mobile Gateway immediately
+    log("  ↳ Routing through Premium Mobile Tunnel...")
     status, theaters = await fetch_with_proxy(api_url, page_url, "MOBILE")
     if status in ("OK", "NOT_LIVE"):
         return status, theaters
 
-    # Tier 3: Engage Premium Residential Backup Gateway
-    log("  ↳ Cellular lane flickered. Routing to Premium Residential Backup...")
+    # Tier 2: Engage Premium Residential Backup Gateway immediately on failure/block
+    log("  ↳ Mobile tunnel rate-limited or failed. Routing to Premium Residential Backup...")
     return await fetch_with_proxy(api_url, page_url, "RESIDENTIAL")
 
 
@@ -334,8 +313,8 @@ async def process_movie_date(session: AsyncSession, semaphore: asyncio.Semaphore
 async def main_async():
     session = AsyncSession(impersonate="chrome110")
     log("=" * 60)
-    log(f"🎬 Dual-Premium Failover BookMyShow Monitor Active")
-    log(f"   Multi-tier Mobile and Residential backup cluster online.")
+    log(f"🎬 Proxy-Only Failover BookMyShow Monitor Active")
+    log(f"   Direct Server queries disabled. Pure Mobile/Residential matrix routing online.")
     log("=" * 60)
 
     for movie in MOVIES:
@@ -345,50 +324,6 @@ async def main_async():
         readable_dates = ", ".join([datetime.datetime.strptime(d, "%Y%m%d").strftime("%b %d") for d in dates_to_track])
         
         startup_alert = (
-            f"🚀 <b>BMS Dual-Premium Monitor Online!</b>\n\n"
+            f"🚀 <b>BMS Proxy-Only Monitor Online!</b>\n\n"
             f"🎬 <b>Movie:</b> {movie_name}\n"
-            f"📅 <b>Horizon Map:</b> {readable_dates}\n\n"
-            f"🛡️ Multi-tier failover cluster engaged and routing cleanly.\n\n"
-            f"👉 <a href='{page_url}'>OPEN BOOKING PAGE →</a>"
-        )
-        await notify(startup_alert, email_subject=f"🚀 BMS Failover Monitor Online: {movie_name}")
-
-    check_count = 0
-    consecutive_failures = 0
-    
-    while True:
-        check_count += 1
-        log(f"Matrix Sweep Check #{check_count} starting...")
-        
-        semaphore = asyncio.Semaphore(1)  
-        tasks = []
-        for movie in MOVIES:
-            for target_date in get_dates_to_track(movie):
-                tasks.append(process_movie_date(session, semaphore, movie, target_date))
-        
-        results = await asyncio.gather(*tasks)
-        
-        if results and all(res is False for res in results):
-            consecutive_failures += 1
-            log(f"⚠️ Entire matrix sweep missed. Consecutive failure counter: {consecutive_failures}/5")
-            
-            if consecutive_failures >= 5:
-                fail_alert = (
-                    f"⚠️ <b>CRITICAL: BMS MONITOR DAEMON FALLING BACK!</b>\n\n"
-                    f"The tracker has failed 5 complete sweeps in a row.\n"
-                    f"Both Premium Mobile and Residential tunnels are currently down.\n\n"
-                    f"💡 <b>Action Required:</b> Please log into your proxy panel dashboards and check if your traffic caps have been exhausted."
-                )
-                await notify(fail_alert, email_subject="⚠️ CRITICAL ERROR: BMS Tracker Daemon Failing")
-                consecutive_failures = 0  
-        else:
-            consecutive_failures = 0  
-            
-        await asyncio.sleep(BASE_CHECK_INTERVAL + random.randint(5, 15))
-
-
-if __name__ == "__main__":
-    try:
-        asyncio.run(main_async())
-    except Exception as e:
-        print(f"Daemon Exit: {e}")
+            f"📅
