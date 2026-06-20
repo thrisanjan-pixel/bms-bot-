@@ -10,7 +10,7 @@ import traceback
 from curl_cffi.requests import AsyncSession
 
 # ──────────────────────────────────────────────────────────
-#  CLEAN CONFIG — Reads exclusively from Railway Variables
+#  CLEAN CONFIG — Reads from Railway, with safe email defaults
 # ──────────────────────────────────────────────────────────
 BOT_TOKEN             = (os.environ.get("BOT_TOKEN") or "").strip()
 CHAT_ID               = (os.environ.get("CHAT_ID") or "").strip()
@@ -18,14 +18,14 @@ CHAT_ID               = (os.environ.get("CHAT_ID") or "").strip()
 EMAIL_ENABLED         = os.environ.get("EMAIL_ENABLED", "true").lower() == "true"
 RESEND_API_KEY        = (os.environ.get("RESEND_API_KEY") or "").strip()
 EMAIL_FROM            = (os.environ.get("EMAIL_FROM") or "onboarding@resend.dev").strip()
-EMAIL_TO              = (os.environ.get("EMAIL_TO") or "").strip()
+EMAIL_TO              = (os.environ.get("EMAIL_TO") or "thrisanjan@gmail.com").strip()
 
 MOBILE_PROXY_ENV      = (os.environ.get("MOBILE_PROXY_URL") or "").strip().strip('"').strip("'")
 RESIDENTIAL_PROXY_ENV = (os.environ.get("RESIDENTIAL_PROXY_URL") or "").strip().strip('"').strip("'")
 # ──────────────────────────────────────────────────────────
 
 CITY_CODE  = "HYD"
-BASE_CHECK_INTERVAL = 45  # Pause between complete matrix sweep loops           
+BASE_CHECK_INTERVAL = 45           
 
 MOVIES = [
     {
@@ -169,8 +169,16 @@ async def send_telegram(message: str) -> bool:
 
 
 async def send_email(subject: str, html_body: str) -> bool:
-    if not EMAIL_ENABLED or not RESEND_API_KEY or not EMAIL_TO:
+    if not EMAIL_ENABLED:
+        log("ℹ️ Email notification skipped: EMAIL_ENABLED is set to False.")
         return False
+    if not RESEND_API_KEY:
+        log("❌ Email notification aborted: RESEND_API_KEY variable is empty or missing.")
+        return False
+    if not EMAIL_TO:
+        log("❌ Email notification aborted: EMAIL_TO destination variable is empty or missing.")
+        return False
+
     try:
         async with AsyncSession(impersonate="chrome110") as session:
             resp = await session.post(
@@ -180,6 +188,7 @@ async def send_email(subject: str, html_body: str) -> bool:
                 timeout=15,
             )
             if resp.status_code in (200, 201):
+                log(f"📧 Startup email delivered to Resend pipeline successfully for {EMAIL_TO}.")
                 return True
             else:
                 log(f"❌ Email delivery failed: Resend gateway returned HTTP {resp.status_code} - Text: {resp.text}")
@@ -328,6 +337,20 @@ async def main_async():
     log("=" * 60)
     log(f"🎬 Proxy-Only Failover BookMyShow Monitor Active")
     log(f"   Direct Server queries disabled. Pure Mobile/Residential matrix routing online.")
+    log("=" * 60)
+
+    # ──────────────────────────────────────────────────────────
+    #  DIAGNOSTIC REPORT — Exposes environment details
+    # ──────────────────────────────────────────────────────────
+    log("[SYSTEM DIAGNOSTICS] Checking Environment Variables...")
+    log(f" -> BOT_TOKEN:       {'VALID SNAPSHOT' if BOT_TOKEN else '⚠️ MISSING'}")
+    log(f" -> CHAT_ID:         {'VALID SNAPSHOT' if CHAT_ID else '⚠️ MISSING'}")
+    log(f" -> EMAIL_ENABLED:   {EMAIL_ENABLED}")
+    log(f" -> RESEND_API_KEY:  {'VALID SNAPSHOT' if RESEND_API_KEY else '⚠️ MISSING'}")
+    log(f" -> EMAIL_FROM:      {EMAIL_FROM}")
+    log(f" -> EMAIL_TO:        {EMAIL_TO}")
+    log(f" -> MOBILE_URL:      {'VALID SNAPSHOT' if MOBILE_PROXY_ENV else '⚠️ MISSING'}")
+    log(f" -> RESIDENTIAL_URL: {'VALID SNAPSHOT' if RESIDENTIAL_PROXY_ENV else '⚠️ MISSING'}")
     log("=" * 60)
 
     for movie in MOVIES:
