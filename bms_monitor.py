@@ -12,17 +12,17 @@ from curl_cffi.requests import AsyncSession
 # ──────────────────────────────────────────────────────────
 #  CONFIG — reads from Railway env vars if set
 # ──────────────────────────────────────────────────────────
-BOT_TOKEN       = os.environ.get("BOT_TOKEN",       "8640561400:AAGoFl81jL6hxhEOVtrfAXpKu3mexjVT16g")
-CHAT_ID         = os.environ.get("CHAT_ID",         "410880894")
+BOT_TOKEN       = os.environ.get("BOT_TOKEN",       "8640561400:AAGoFl81jL6hxhEOVtrfAXpKu3mexjVT16g").strip()
+CHAT_ID         = os.environ.get("CHAT_ID",         "410880894").strip()
 
 EMAIL_ENABLED   = os.environ.get("EMAIL_ENABLED", "true").lower() == "true"
-RESEND_API_KEY  = os.environ.get("RESEND_API_KEY", "re_caz97Ucb_FU7nSQuHaaPF9a7GxrGPqSfV")
-EMAIL_FROM      = os.environ.get("EMAIL_FROM", "onboarding@resend.dev")
-EMAIL_TO        = os.environ.get("EMAIL_TO", "thrisanjan@gmail.com")
+RESEND_API_KEY  = os.environ.get("RESEND_API_KEY", "re_caz97Ucb_FU7nSQuHaaPF9a7GxrGPqSfV").strip()
+EMAIL_FROM      = os.environ.get("EMAIL_FROM", "onboarding@resend.dev").strip()
+EMAIL_TO        = os.environ.get("EMAIL_TO", "thrisanjan@gmail.com").strip()
 
-# Dynamic Proxy Strings via Railway Env Variables (with fallback defaults)
-MOBILE_PROXY_ENV = os.environ.get("MOBILE_PROXY_URL", "http://on0xutsx1n-corp.mobile.res-country-IN-hold-session-session-{session}:SiGyraQjeRR7Y1tG@109.236.82.42:443")
-RESIDENTIAL_PROXY_ENV = os.environ.get("RESIDENTIAL_PROXY_URL", "http://asdasda-zone-resi-region-IN-st--city--session-{session}-sessionTime-10:asdasdasd@southasia.a1proxy.com:15122")
+# Dynamic Proxy Strings via Railway Env Variables (with fallback defaults and strict sanitization)
+MOBILE_PROXY_ENV = os.environ.get("MOBILE_PROXY_URL", "http://on0xutsx1n-corp.mobile.res-country-IN-hold-session-session-{session}:SiGyraQjeRR7Y1tG@109.236.82.42:443").strip().strip('"').strip("'")
+RESIDENTIAL_PROXY_ENV = os.environ.get("RESIDENTIAL_PROXY_URL", "http://asdasda-zone-resi-region-IN-st--city--session-{session}-sessionTime-10:asdasdasd@southasia.a1proxy.com:15122").strip().strip('"').strip("'")
 # ──────────────────────────────────────────────────────────
 
 CITY_CODE  = "HYD"
@@ -137,11 +137,15 @@ async def fetch_with_proxy(api_url: str, page_url: str, proxy_type: str) -> tupl
                 proxy=proxy_endpoint,
                 timeout=7
             )
-            if resp.status_code == 200:
+            # Route response directly to parser to evaluate status codes accurately
+            status, theaters = _parse_api_response(resp)
+            if status == "OK":
                 log(f"   [{proxy_type}] Routing breakthrough confirmed — Response: HTTP 200")
-                return _parse_api_response(resp)
-            return "ERROR", set()
-    except Exception:
+            elif status == "BLOCKED":
+                log(f"   ⚠️ [{proxy_type}] Gateway rate-limited or blocked — Response: HTTP {resp.status_code}")
+            return status, theaters
+    except Exception as e:
+        log(f"   ❌ [{proxy_type}] Transport gateway error: {e}")
         return "ERROR", set()
 
 
