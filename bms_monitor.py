@@ -34,7 +34,7 @@ MOVIES = [
     },
     {
         "name": "Supergirl",
-        "code": "ET00475569",
+        "code": "ET00501636",      # 🚨 UPDATED TO LIVE 3D TICKET CODE
         "slug": "supergirl",
         "start_date": "20260626",  
         "days_to_track": 3         
@@ -43,7 +43,7 @@ MOVIES = [
         "name": "The Odyssey",
         "code": "ET00452034",
         "slug": "the-odyssey",
-        "start_date": "20260717",  # Updated release date
+        "start_date": "20260717",  
         "days_to_track": 3         
     }
 ]
