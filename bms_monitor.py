@@ -106,7 +106,9 @@ def get_mobile_proxy_url() -> str:
 
 
 def get_residential_proxy_url() -> str:
-    rand_session = "".join(random.choices(string.ascii_letters + string.digits, k=4))
+    # CRITICAL FIX: Enforce strictly lowercase letters + digits. 
+    # Uppercase chars break authentication parameters on most residential backends.
+    rand_session = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
     if "{session}" in RESIDENTIAL_PROXY_ENV:
         return RESIDENTIAL_PROXY_ENV.format(session=rand_session)
     return RESIDENTIAL_PROXY_ENV
