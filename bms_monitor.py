@@ -10,19 +10,18 @@ import traceback
 from curl_cffi.requests import AsyncSession
 
 # ──────────────────────────────────────────────────────────
-#  CONFIG — reads from Railway env vars if set
+#  CLEAN CONFIG — Reads exclusively from Railway Variables
 # ──────────────────────────────────────────────────────────
-BOT_TOKEN       = os.environ.get("BOT_TOKEN",       "8640561400:AAGoFl81jL6hxhEOVtrfAXpKu3mexjVT16g").strip()
-CHAT_ID         = os.environ.get("CHAT_ID",         "410880894").strip()
+BOT_TOKEN             = (os.environ.get("BOT_TOKEN") or "").strip()
+CHAT_ID               = (os.environ.get("CHAT_ID") or "").strip()
 
-EMAIL_ENABLED   = os.environ.get("EMAIL_ENABLED", "true").lower() == "true"
-RESEND_API_KEY  = os.environ.get("RESEND_API_KEY", "re_caz97Ucb_FU7nSQuHaaPF9a7GxrGPqSfV").strip()
-EMAIL_FROM      = os.environ.get("EMAIL_FROM", "onboarding@resend.dev").strip()
-EMAIL_TO        = os.environ.get("EMAIL_TO", "thrisanjan@gmail.com").strip()
+EMAIL_ENABLED         = os.environ.get("EMAIL_ENABLED", "true").lower() == "true"
+RESEND_API_KEY        = (os.environ.get("RESEND_API_KEY") or "").strip()
+EMAIL_FROM            = (os.environ.get("EMAIL_FROM") or "onboarding@resend.dev").strip()
+EMAIL_TO              = (os.environ.get("EMAIL_TO") or "").strip()
 
-# Dynamic Proxy Strings via Railway Env Variables (with strict trailing space and quote cleaning)
-MOBILE_PROXY_ENV = os.environ.get("MOBILE_PROXY_URL", "http://on0xutsx1n-corp.mobile.res-country-IN-hold-session-session-{session}:SiGyraQjeRR7Y1tG@109.236.82.42:443").strip().strip('"').strip("'")
-RESIDENTIAL_PROXY_ENV = os.environ.get("RESIDENTIAL_PROXY_URL", "http://asdasda-zone-resi-region-IN-st--city--session-{session}-sessionTime-10:asdasdasd@southasia.a1proxy.com:15122").strip().strip('"').strip("'")
+MOBILE_PROXY_ENV      = (os.environ.get("MOBILE_PROXY_URL") or "").strip().strip('"').strip("'")
+RESIDENTIAL_PROXY_ENV = (os.environ.get("RESIDENTIAL_PROXY_URL") or "").strip().strip('"').strip("'")
 # ──────────────────────────────────────────────────────────
 
 CITY_CODE  = "HYD"
@@ -99,6 +98,8 @@ def get_urls(movie: dict, date: str) -> tuple:
 
 
 def get_mobile_proxy_url() -> str:
+    if not MOBILE_PROXY_ENV:
+        return ""
     rand_session = "".join(random.choices(string.digits + "abcdef", k=12))
     if "{session}" in MOBILE_PROXY_ENV:
         return MOBILE_PROXY_ENV.format(session=rand_session)
@@ -106,8 +107,8 @@ def get_mobile_proxy_url() -> str:
 
 
 def get_residential_proxy_url() -> str:
-    # CRITICAL FIX: Enforce strictly lowercase letters + digits. 
-    # Uppercase chars break authentication parameters on most residential backends.
+    if not RESIDENTIAL_PROXY_ENV:
+        return ""
     rand_session = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
     if "{session}" in RESIDENTIAL_PROXY_ENV:
         return RESIDENTIAL_PROXY_ENV.format(session=rand_session)
@@ -116,8 +117,11 @@ def get_residential_proxy_url() -> str:
 
 async def fetch_with_proxy(api_url: str, page_url: str, proxy_type: str) -> tuple:
     proxy_endpoint = get_mobile_proxy_url() if proxy_type == "MOBILE" else get_residential_proxy_url()
+    if not proxy_endpoint:
+        log(f"   ⚠️ [{proxy_type}] Configured environment URL string is empty or missing.")
+        return "ERROR", set()
+
     cfg = random.choice(HEADER_CONFIGS)
-    
     api_headers = {
         "x-bms-id": "IN-HYD",
         "x-region-code": CITY_CODE,
@@ -150,18 +154,22 @@ async def fetch_with_proxy(api_url: str, page_url: str, proxy_type: str) -> tupl
 
 
 async def send_telegram(message: str) -> bool:
+    if not BOT_TOKEN or not CHAT_ID:
+        log("⚠️ Telegram configuration keys missing from environment variables.")
+        return False
     api_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {"chat_id": CHAT_ID, "text": message, "parse_mode": "HTML"}
     try:
         async with AsyncSession(impersonate="chrome110") as session:
             resp = await session.post(api_url, json=payload, timeout=10)
             return resp.status_code == 200
-    except Exception:
+    except Exception as e:
+        log(f"❌ Telegram transmission failure: {e}")
         return False
 
 
 async def send_email(subject: str, html_body: str) -> bool:
-    if not EMAIL_ENABLED or RESEND_API_KEY == "YOUR_RESEND_API_KEY_HERE":
+    if not EMAIL_ENABLED or not RESEND_API_KEY or not EMAIL_TO:
         return False
     try:
         async with AsyncSession(impersonate="chrome110") as session:
@@ -171,8 +179,13 @@ async def send_email(subject: str, html_body: str) -> bool:
                 json={"from": f"BMS Bot <{EMAIL_FROM}>", "to": [EMAIL_TO], "subject": subject, "html": html_body},
                 timeout=15,
             )
-            return resp.status_code in (200, 201)
-    except Exception:
+            if resp.status_code in (200, 201):
+                return True
+            else:
+                log(f"❌ Email delivery failed: Resend gateway returned HTTP {resp.status_code} - Text: {resp.text}")
+                return False
+    except Exception as e:
+        log(f"❌ Email transport system error: {e}")
         return False
 
 
@@ -263,13 +276,11 @@ def _parse_api_response(resp) -> tuple:
 
 
 async def get_current_theaters(session: AsyncSession, page_url: str, api_url: str) -> tuple:
-    # Tier 1: Engage Premium Cellular Mobile Gateway immediately
     log("  ↳ Routing through Premium Mobile Tunnel...")
     status, theaters = await fetch_with_proxy(api_url, page_url, "MOBILE")
     if status in ("OK", "NOT_LIVE"):
         return status, theaters
 
-    # Tier 2: Engage Premium Residential Backup Gateway immediately on failure/block
     log("  ↳ Mobile tunnel rate-limited or failed. Routing to Premium Residential Backup...")
     return await fetch_with_proxy(api_url, page_url, "RESIDENTIAL")
 
