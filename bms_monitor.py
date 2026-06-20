@@ -19,6 +19,10 @@ EMAIL_ENABLED   = os.environ.get("EMAIL_ENABLED", "true").lower() == "true"
 RESEND_API_KEY  = os.environ.get("RESEND_API_KEY", "re_caz97Ucb_FU7nSQuHaaPF9a7GxrGPqSfV")
 EMAIL_FROM      = os.environ.get("EMAIL_FROM", "onboarding@resend.dev")
 EMAIL_TO        = os.environ.get("EMAIL_TO", "thrisanjan@gmail.com")
+
+# Dynamic Proxy Strings via Railway Env Variables (with fallback defaults)
+MOBILE_PROXY_ENV = os.environ.get("MOBILE_PROXY_URL", "http://on0xutsx1n-corp.mobile.res-country-IN-hold-session-session-{session}:SiGyraQjeRR7Y1tG@109.236.82.42:443")
+RESIDENTIAL_PROXY_ENV = os.environ.get("RESIDENTIAL_PROXY_URL", "http://asdasda-zone-resi-region-IN-st--city--session-{session}-sessionTime-10:asdasdasd@southasia.a1proxy.com:15122")
 # ──────────────────────────────────────────────────────────
 
 CITY_CODE  = "HYD"
@@ -94,16 +98,18 @@ def get_urls(movie: dict, date: str) -> tuple:
     return page_url, info_page_url, api_url
 
 
-# ─── PROXY GATEWAY GENERATORS ─────────────────────────────────────────────
+# ─── PROXY GATEWAY GENERATORS (Dynamically Injecting Sessions) ────────────
 def get_mobile_proxy_url() -> str:
     rand_session = "".join(random.choices(string.digits + "abcdef", k=12))
-    username = f"on0xutsx1n-corp.mobile.res-country-IN-hold-session-session-{rand_session}"
-    return f"http://{username}:SiGyraQjeRR7Y1tG@109.236.82.42:443"
+    if "{session}" in MOBILE_PROXY_ENV:
+        return MOBILE_PROXY_ENV.format(session=rand_session)
+    return MOBILE_PROXY_ENV
 
 def get_residential_proxy_url() -> str:
     rand_session = "".join(random.choices(string.ascii_letters + string.digits, k=4))
-    username = f"asdasda-zone-resi-region-IN-st--city--session-{rand_session}-sessionTime-10"
-    return f"http://{username}:asdasdasd@southasia.a1proxy.com:15122"
+    if "{session}" in RESIDENTIAL_PROXY_ENV:
+        return RESIDENTIAL_PROXY_ENV.format(session=rand_session)
+    return RESIDENTIAL_PROXY_ENV
 # ──────────────────────────────────────────────────────────────────────────
 
 
@@ -132,7 +138,7 @@ async def fetch_with_proxy(api_url: str, page_url: str, proxy_type: str) -> tupl
                 timeout=7
             )
             if resp.status_code == 200:
-                log(f"  [{proxy_type}] Routing breakthrough confirmed — Response: HTTP 200")
+                log(f"   [{proxy_type}] Routing breakthrough confirmed — Response: HTTP 200")
                 return _parse_api_response(resp)
             return "ERROR", set()
     except Exception:
@@ -367,7 +373,7 @@ async def main_async():
                     f"⚠️ <b>CRITICAL: BMS MONITOR DAEMON FALLING BACK!</b>\n\n"
                     f"The tracker has failed 5 complete sweeps in a row.\n"
                     f"Both Premium Mobile and Residential tunnels are currently down.\n\n"
-                    f"💡 <b>Action Required:</b> Please log into your proxy panel dashboards and check if your 200MB trial traffic caps have been exhausted."
+                    f"💡 <b>Action Required:</b> Please log into your proxy panel dashboards and check if your traffic caps have been exhausted."
                 )
                 await notify(fail_alert, email_subject="⚠️ CRITICAL ERROR: BMS Tracker Daemon Failing")
                 consecutive_failures = 0  
