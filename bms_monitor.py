@@ -326,4 +326,48 @@ async def main_async():
         startup_alert = (
             f"🚀 <b>BMS Proxy-Only Monitor Online!</b>\n\n"
             f"🎬 <b>Movie:</b> {movie_name}\n"
-            f"📅
+            f"📅 <b>Horizon Map:</b> {readable_dates}\n\n"
+            f"🛡️ Server IP bypass complete. Checking exclusively via premium routing channels.\n\n"
+            f"👉 <a href='{page_url}'>OPEN BOOKING PAGE →</a>"
+        )
+        await notify(startup_alert, email_subject=f"🚀 BMS Monitor Online: {movie_name}")
+
+    check_count = 0
+    consecutive_failures = 0
+    
+    while True:
+        check_count += 1
+        log(f"Matrix Sweep Check #{check_count} starting...")
+        
+        semaphore = asyncio.Semaphore(1)  
+        tasks = []
+        for movie in MOVIES:
+            for target_date in get_dates_to_track(movie):
+                tasks.append(process_movie_date(session, semaphore, movie, target_date))
+        
+        results = await asyncio.gather(*tasks)
+        
+        if results and all(res is False for res in results):
+            consecutive_failures += 1
+            log(f"⚠️ Entire matrix sweep missed. Consecutive failure counter: {consecutive_failures}/5")
+            
+            if consecutive_failures >= 5:
+                fail_alert = (
+                    f"⚠️ <b>CRITICAL: BMS MONITOR DAEMON FALLING BACK!</b>\n\n"
+                    f"The tracker has failed 5 complete sweeps in a row.\n"
+                    f"Both Premium Mobile and Residential tunnels are returning failures.\n\n"
+                    f"💡 <b>Action Required:</b> Please log into your proxy panel dashboards and check if your traffic caps or account limits have been exhausted."
+                )
+                await notify(fail_alert, email_subject="⚠️ CRITICAL ERROR: BMS Tracker Daemon Failing")
+                consecutive_failures = 0  
+        else:
+            consecutive_failures = 0  
+            
+        await asyncio.sleep(BASE_CHECK_INTERVAL + random.randint(5, 15))
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main_async())
+    except Exception as e:
+        print(f"Daemon Exit: {e}")
