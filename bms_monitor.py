@@ -10,22 +10,19 @@ import traceback
 from curl_cffi.requests import AsyncSession
 
 # ──────────────────────────────────────────────────────────
-#  CLEAN CONFIG — Reads from Railway, with safe email defaults
+#  CONFIG — Reads credentials securely from script defaults
 # ──────────────────────────────────────────────────────────
-BOT_TOKEN             = (os.environ.get("BOT_TOKEN") or "").strip()
-CHAT_ID               = (os.environ.get("CHAT_ID") or "").strip()
+BOT_TOKEN       = "8640561400:AAGoFl81jL6hxhEOVtrfAXpKu3mexjVT16g"
+CHAT_ID         = "410880894"
 
-EMAIL_ENABLED         = os.environ.get("EMAIL_ENABLED", "true").lower() == "true"
-RESEND_API_KEY        = (os.environ.get("RESEND_API_KEY") or "").strip()
-EMAIL_FROM            = (os.environ.get("EMAIL_FROM") or "onboarding@resend.dev").strip()
-EMAIL_TO              = (os.environ.get("EMAIL_TO") or "thrisanjan@gmail.com").strip()
-
-MOBILE_PROXY_ENV      = (os.environ.get("MOBILE_PROXY_URL") or "").strip().strip('"').strip("'")
-RESIDENTIAL_PROXY_ENV = (os.environ.get("RESIDENTIAL_PROXY_URL") or "").strip().strip('"').strip("'")
+EMAIL_ENABLED   = True
+RESEND_API_KEY  = "re_caz97Ucb_FU7nSQuHaaPF9a7GxrGPqSfV"
+EMAIL_FROM      = "onboarding@resend.dev"
+EMAIL_TO        = "thrisanjan@gmail.com"
 # ──────────────────────────────────────────────────────────
 
 CITY_CODE  = "HYD"
-BASE_CHECK_INTERVAL = 45           
+BASE_CHECK_INTERVAL = 45  
 
 MOVIES = [
     {
@@ -97,31 +94,23 @@ def get_urls(movie: dict, date: str) -> tuple:
     return page_url, info_page_url, api_url
 
 
+# ─── HARDCODED PROXY GATEWAY GENERATORS ───────────────────────────────────
 def get_mobile_proxy_url() -> str:
-    if not MOBILE_PROXY_ENV:
-        return ""
-    rand_session = "".join(random.choices(string.digits + "abcdef", k=12))
-    if "{session}" in MOBILE_PROXY_ENV:
-        return MOBILE_PROXY_ENV.format(session=rand_session)
-    return MOBILE_PROXY_ENV
-
+    # 📱 Fresh 1GB Mobile Entry Lane (Cleaned of State lock for wide availability)
+    rand_session = "".join(random.choices(string.ascii_lowercase + string.digits, k=12))
+    return f"http://u1iuxoqrh5-corp.mobile.res-country-IN-hold-session-session-{rand_session}:ov8b05zHVxOSesVO@62.112.8.229:443"
 
 def get_residential_proxy_url() -> str:
-    if not RESIDENTIAL_PROXY_ENV:
-        return ""
+    # 🏠 Fresh Port 15127 Residential Lane
     rand_session = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
-    if "{session}" in RESIDENTIAL_PROXY_ENV:
-        return RESIDENTIAL_PROXY_ENV.format(session=rand_session)
-    return RESIDENTIAL_PROXY_ENV
+    return f"http://asdasdas-zone-resi-region-IN-st--city--session-{rand_session}-sessionTime-10:dasdasd@southasia.a1proxy.com:15127"
+# ──────────────────────────────────────────────────────────────────────────
 
 
 async def fetch_with_proxy(api_url: str, page_url: str, proxy_type: str) -> tuple:
     proxy_endpoint = get_mobile_proxy_url() if proxy_type == "MOBILE" else get_residential_proxy_url()
-    if not proxy_endpoint:
-        log(f"   ⚠️ [{proxy_type}] Configured environment URL string is empty or missing.")
-        return "ERROR", set()
-
     cfg = random.choice(HEADER_CONFIGS)
+    
     api_headers = {
         "x-bms-id": "IN-HYD",
         "x-region-code": CITY_CODE,
@@ -154,9 +143,6 @@ async def fetch_with_proxy(api_url: str, page_url: str, proxy_type: str) -> tupl
 
 
 async def send_telegram(message: str) -> bool:
-    if not BOT_TOKEN or not CHAT_ID:
-        log("⚠️ Telegram configuration keys missing from environment variables.")
-        return False
     api_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {"chat_id": CHAT_ID, "text": message, "parse_mode": "HTML"}
     try:
@@ -170,15 +156,7 @@ async def send_telegram(message: str) -> bool:
 
 async def send_email(subject: str, html_body: str) -> bool:
     if not EMAIL_ENABLED:
-        log("ℹ️ Email notification skipped: EMAIL_ENABLED is set to False.")
         return False
-    if not RESEND_API_KEY:
-        log("❌ Email notification aborted: RESEND_API_KEY variable is empty or missing.")
-        return False
-    if not EMAIL_TO:
-        log("❌ Email notification aborted: EMAIL_TO destination variable is empty or missing.")
-        return False
-
     try:
         async with AsyncSession(impersonate="chrome110") as session:
             resp = await session.post(
@@ -187,12 +165,7 @@ async def send_email(subject: str, html_body: str) -> bool:
                 json={"from": f"BMS Bot <{EMAIL_FROM}>", "to": [EMAIL_TO], "subject": subject, "html": html_body},
                 timeout=15,
             )
-            if resp.status_code in (200, 201):
-                log(f"📧 Startup email delivered to Resend pipeline successfully for {EMAIL_TO}.")
-                return True
-            else:
-                log(f"❌ Email delivery failed: Resend gateway returned HTTP {resp.status_code} - Text: {resp.text}")
-                return False
+            return resp.status_code in (200, 201)
     except Exception as e:
         log(f"❌ Email transport system error: {e}")
         return False
@@ -285,12 +258,12 @@ def _parse_api_response(resp) -> tuple:
 
 
 async def get_current_theaters(session: AsyncSession, page_url: str, api_url: str) -> tuple:
-    log("  ↳ Routing through Premium Mobile Tunnel...")
+    log("  ↳ Routing through Hardcoded Mobile Tunnel...")
     status, theaters = await fetch_with_proxy(api_url, page_url, "MOBILE")
     if status in ("OK", "NOT_LIVE"):
         return status, theaters
 
-    log("  ↳ Mobile tunnel rate-limited or failed. Routing to Premium Residential Backup...")
+    log("  ↳ Mobile pipeline rate-limited. Routing to Hardcoded Residential Backup...")
     return await fetch_with_proxy(api_url, page_url, "RESIDENTIAL")
 
 
@@ -335,22 +308,8 @@ async def process_movie_date(session: AsyncSession, semaphore: asyncio.Semaphore
 async def main_async():
     session = AsyncSession(impersonate="chrome110")
     log("=" * 60)
-    log(f"🎬 Proxy-Only Failover BookMyShow Monitor Active")
-    log(f"   Direct Server queries disabled. Pure Mobile/Residential matrix routing online.")
-    log("=" * 60)
-
-    # ──────────────────────────────────────────────────────────
-    #  DIAGNOSTIC REPORT — Exposes environment details
-    # ──────────────────────────────────────────────────────────
-    log("[SYSTEM DIAGNOSTICS] Checking Environment Variables...")
-    log(f" -> BOT_TOKEN:       {'VALID SNAPSHOT' if BOT_TOKEN else '⚠️ MISSING'}")
-    log(f" -> CHAT_ID:         {'VALID SNAPSHOT' if CHAT_ID else '⚠️ MISSING'}")
-    log(f" -> EMAIL_ENABLED:   {EMAIL_ENABLED}")
-    log(f" -> RESEND_API_KEY:  {'VALID SNAPSHOT' if RESEND_API_KEY else '⚠️ MISSING'}")
-    log(f" -> EMAIL_FROM:      {EMAIL_FROM}")
-    log(f" -> EMAIL_TO:        {EMAIL_TO}")
-    log(f" -> MOBILE_URL:      {'VALID SNAPSHOT' if MOBILE_PROXY_ENV else '⚠️ MISSING'}")
-    log(f" -> RESIDENTIAL_URL: {'VALID SNAPSHOT' if RESIDENTIAL_PROXY_ENV else '⚠️ MISSING'}")
+    log(f"🎬 Internalized Hardcoded Proxy BookMyShow Monitor Active")
+    log(f"   Bypassing environment system. Pure code array matrix lookups active.")
     log("=" * 60)
 
     for movie in MOVIES:
@@ -360,13 +319,13 @@ async def main_async():
         readable_dates = ", ".join([datetime.datetime.strptime(d, "%Y%m%d").strftime("%b %d") for d in dates_to_track])
         
         startup_alert = (
-            f"🚀 <b>BMS Proxy-Only Monitor Online!</b>\n\n"
+            f"🚀 <b>BMS Hardcoded Monitor Online!</b>\n\n"
             f"🎬 <b>Movie:</b> {movie_name}\n"
             f"📅 <b>Horizon Map:</b> {readable_dates}\n\n"
-            f"🛡️ Server IP bypass complete. Checking exclusively via premium routing channels.\n\n"
+            f"🛡️ Internal connection array loaded successfully.\n\n"
             f"👉 <a href='{page_url}'>OPEN BOOKING PAGE →</a>"
         )
-        await notify(startup_alert, email_subject=f"🚀 BMS Monitor Online: {movie_name}")
+        await notify(startup_alert, email_subject=f"🚀 BMS Hardcoded Monitor Online: {movie_name}")
 
     check_count = 0
     consecutive_failures = 0
@@ -389,12 +348,12 @@ async def main_async():
             
             if consecutive_failures >= 5:
                 fail_alert = (
-                    f"⚠️ <b>CRITICAL: BMS MONITOR DAEMON FALLING BACK!</b>\n\n"
-                    f"The tracker has failed 5 complete sweeps in a row.\n"
-                    f"Both Premium Mobile and Residential tunnels are returning failures.\n\n"
-                    f"💡 <b>Action Required:</b> Please log into your proxy panel dashboards and check if your traffic caps or account limits have been exhausted."
+                    f"⚠️ <b>CRITICAL: BMS TRACKER CLUSTER DOWN!</b>\n\n"
+                    f"The daemon has dropped 5 tracking passes consecutively.\n"
+                    f"Both internal mobile and residential clusters are reporting authentication blocks.\n\n"
+                    f"💡 <b>Action Required:</b> Data allowances on proxy platforms may be spent."
                 )
-                await notify(fail_alert, email_subject="⚠️ CRITICAL ERROR: BMS Tracker Daemon Failing")
+                await notify(fail_alert, email_subject="⚠️ CRITICAL ERROR: BMS Tracker Failing")
                 consecutive_failures = 0  
         else:
             consecutive_failures = 0  
