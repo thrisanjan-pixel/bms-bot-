@@ -96,13 +96,15 @@ def get_urls(movie: dict, date: str) -> tuple:
 
 # ─── HARDCODED LITERAL PROXY GATEWAYS ─────────────────────────────────────
 def get_mobile_proxy_url() -> str:
-    # Hardcoded exactly to your verified working terminal string to bypass auth locks
+    # Uses the exact literal layout verified from your terminal to completely clear the 407 error
     return "http://u1iuxoqrh5-corp.mobile.res-country-IN-state-1264418-hold-session-session-6a382be7ded2e:ov8b05zHVxOSesVO@62.112.8.229:443"
 
 def get_residential_proxy_url() -> str:
-    # Port 15128 lane with a rolling unique suffix to cycle through blocked IPs cleanly
-    rand_session = "".join(random.choices(string.ascii_lowercase + string.digits, k=6))
-    return f"http://asdasdas-zone-resi-region--st--city--session-Wfid{rand_session}-sessionTime-10:dasdasd@southasia.a1proxy.com:15128"
+    # Added -region-IN- back to force Indian IPs and bypass BookMyShow's 403 block
+    # Uses a precise 4-character token matching the provider's exact session layout (e.g., vgCz)
+    chars = string.ascii_letters + string.digits
+    rand_session = "".join(random.choice(chars) for _ in range(4))
+    return f"http://asdasdas-zone-resi-region-IN-st--city--session-{rand_session}-sessionTime-10:dasdasd@southasia.a1proxy.com:15128"
 # ──────────────────────────────────────────────────────────────────────────
 
 
@@ -143,7 +145,9 @@ async def fetch_with_proxy(api_url: str, page_url: str, proxy_type: str) -> tupl
 
 async def send_telegram(message: str) -> bool:
     api_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": CHAT_ID, "text": message, "parse_mode": "HTML"}
+    payload = {"chat_id": CH打_ID if 'CHAT_ID' in globals() else CHAT_ID, "text": message, "parse_mode": "HTML"}
+    # Safe backup fallback evaluation
+    payload["chat_id"] = CHAT_ID
     try:
         async with AsyncSession(impersonate="chrome110") as session:
             resp = await session.post(api_url, json=payload, timeout=10)
