@@ -94,16 +94,14 @@ def get_urls(movie: dict, date: str) -> tuple:
     return page_url, info_page_url, api_url
 
 
-# ─── HARDCODED PROXY GATEWAY GENERATORS ───────────────────────────────────
+# ─── HARDCODED LITERAL PROXY GATEWAYS ─────────────────────────────────────
 def get_mobile_proxy_url() -> str:
-    # 📱 Fresh 1GB Mobile Entry Lane (Cleaned of State lock for wide availability)
-    rand_session = "".join(random.choices(string.ascii_lowercase + string.digits, k=12))
-    return f"http://u1iuxoqrh5-corp.mobile.res-country-IN-hold-session-session-{rand_session}:ov8b05zHVxOSesVO@62.112.8.229:443"
+    # Exact authenticated string layout verified from your terminal test
+    return "http://u1iuxoqrh5-corp.mobile.res-country-IN-state-1264418-hold-session-session-6a382be7ded2e:ov8b05zHVxOSesVO@62.112.8.229:443"
 
 def get_residential_proxy_url() -> str:
-    # 🏠 Fresh Port 15127 Residential Lane
-    rand_session = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
-    return f"http://asdasdas-zone-resi-region-IN-st--city--session-{rand_session}-sessionTime-10:dasdasd@southasia.a1proxy.com:15127"
+    # Exact authenticated string layout verified from your residential test
+    return "http://asdasdas-zone-resi-region-IN-st--city--session-vgCz-sessionTime-10:dasdasd@southasia.a1proxy.com:15127"
 # ──────────────────────────────────────────────────────────────────────────
 
 
