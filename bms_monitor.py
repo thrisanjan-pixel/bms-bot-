@@ -96,14 +96,13 @@ def get_urls(movie: dict, date: str) -> tuple:
 
 # ─── HARDCODED LITERAL PROXY GATEWAYS ─────────────────────────────────────
 def get_mobile_proxy_url() -> str:
-    # 📱 Verified via Checker.net endpoint layout
-    rand_session = "".join(random.choices(string.ascii_lowercase + string.digits, k=12))
-    return f"http://u1iuxoqrh5-mobile-country-IN-hold-session-session-{rand_session}:ov8b05zHVxOSesVO@175.110.115.153:9999"
+    # Hardcoded exactly to your verified working terminal string to bypass auth locks
+    return "http://u1iuxoqrh5-corp.mobile.res-country-IN-state-1264418-hold-session-session-6a382be7ded2e:ov8b05zHVxOSesVO@62.112.8.229:443"
 
 def get_residential_proxy_url() -> str:
-    # 🏠 Fresh Port 15128 Residential Route with dynamic automatic rotation
-    rand_session = "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
-    return f"http://asdasdas-zone-resi-region--st--city--session-{rand_session}-sessionTime-10:dasdasd@southasia.a1proxy.com:15128"
+    # Port 15128 lane with a rolling unique suffix to cycle through blocked IPs cleanly
+    rand_session = "".join(random.choices(string.ascii_lowercase + string.digits, k=6))
+    return f"http://asdasdas-zone-resi-region--st--city--session-Wfid{rand_session}-sessionTime-10:dasdasd@southasia.a1proxy.com:15128"
 # ──────────────────────────────────────────────────────────────────────────
 
 
