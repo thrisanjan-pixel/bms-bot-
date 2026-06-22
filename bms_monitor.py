@@ -96,9 +96,11 @@ def get_urls(movie: dict, date: str) -> tuple:
 
 # ─── HARDCODED LITERAL PROXY GATEWAYS ─────────────────────────────────────
 def get_mobile_proxy_url() -> str:
-    return "http://h8u0zfbivg-corp.mobile.res-country-IN-hold-session-session-6a3839e1e4c79:2oQ5S7OlC7oDbCMG@109.236.82.42:443"
+    # 📱 PRIMARY GATEWAY: Your DIY Android Mobile Phone Proxy Server via Localtonet
+    return "http://ortzyzpusb.localtonetproxy.com:3764"
 
 def get_residential_proxy_url() -> str:
+    # 🏠 BACKUP SAFE ROUTE: Commercial India-targeted residential fallback lane
     chars = string.ascii_letters + string.digits
     rand_session = "".join(random.choice(chars) for _ in range(4))
     return f"http://gtvqr8x11k1-zone-resi-region-IN-st--city--session-{rand_session}-sessionTime-10:kOaSgFHe1bho@southasia.a1proxy.com:15136"
@@ -147,13 +149,13 @@ async def send_telegram(message: str) -> bool:
         async with AsyncSession(impersonate="chrome110") as session:
             resp = await session.post(api_url, json=payload, timeout=10)
             if resp.status_code == 200:
-                log("📲 Telegram startup handshake confirmed.")
+                log("📲 Telegram notification link verified.")
                 return True
             else:
-                log(f"❌ Telegram rejected token dispatch. Code: {resp.status_code}, Response: {resp.text}")
+                log(f"❌ Telegram transmission failure. Code: {resp.status_code}")
                 return False
     except Exception as e:
-        log(f"❌ Telegram transmission failure: {e}")
+        log(f"❌ Telegram transmission error: {e}")
         return False
 
 
@@ -169,13 +171,12 @@ async def send_email(subject: str, html_body: str) -> bool:
                 timeout=15,
             )
             if resp.status_code in (200, 201):
-                log(f"📧 Startup alert dispatched successfully to Resend pipeline for {EMAIL_TO}.")
                 return True
             else:
-                log(f"❌ Resend API Error. Status Code: {resp.status_code}, Context: {resp.text}")
+                log(f"❌ Resend API drop encountered. Status: {resp.status_code}")
                 return False
     except Exception as e:
-        log(f"❌ Email transport system exception error: {e}")
+        log(f"❌ Email transport system error: {e}")
         return False
 
 
@@ -266,12 +267,14 @@ def _parse_api_response(resp) -> tuple:
 
 
 async def get_current_theaters(session: AsyncSession, page_url: str, api_url: str) -> tuple:
-    log("  ↳ Routing through Hardcoded Mobile Tunnel...")
+    # 🌟 Priority 1: Check using your local phone tunnel
+    log("  ↳ Routing through Primary Mobile Tunnel (Localtonet Phone Data)...")
     status, theaters = await fetch_with_proxy(api_url, page_url, "MOBILE")
     if status in ("OK", "NOT_LIVE"):
         return status, theaters
 
-    log("  ↳ Mobile pipeline rate-limited. Routing to Hardcoded Residential Backup...")
+    # 🌟 Priority 2 (Backup): Failover to the residential proxy lane only if the phone disconnects
+    log("  ↳ Primary phone pipeline down. Routing to Hardcoded Residential Backup (A1Proxy)...")
     return await fetch_with_proxy(api_url, page_url, "RESIDENTIAL")
 
 
