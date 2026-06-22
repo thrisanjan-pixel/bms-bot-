@@ -96,14 +96,14 @@ def get_urls(movie: dict, date: str) -> tuple:
 
 # ─── HARDCODED LITERAL PROXY GATEWAYS ─────────────────────────────────────
 def get_mobile_proxy_url() -> str:
-    # 📱 Fresh Mobile Proxy Gateway configured with your newest working literal endpoint layout
+    # 📱 Production Mobile Gateway locked to your verified target endpoint loop string
     return "http://h8u0zfbivg-corp.mobile.res-country-IN-hold-session-session-6a3839e1e4c79:2oQ5S7OlC7oDbCMG@109.236.82.42:443"
 
 def get_residential_proxy_url() -> str:
-    # 🏠 Port 15128 India-targeted residential fallback lane with 4-character session rotater
+    # 🏠 Brand New Port 15136 India-targeted residential route with dynamic auto-rotation
     chars = string.ascii_letters + string.digits
     rand_session = "".join(random.choice(chars) for _ in range(4))
-    return f"http://asdasdas-zone-resi-region-IN-st--city--session-{rand_session}-sessionTime-10:dasdasd@southasia.a1proxy.com:15128"
+    return f"http://gtvqr8x11k1-zone-resi-region-IN-st--city--session-{rand_session}-sessionTime-10:kOaSgFHe1bho@southasia.a1proxy.com:15136"
 # ──────────────────────────────────────────────────────────────────────────
 
 
