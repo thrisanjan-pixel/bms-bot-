@@ -95,12 +95,12 @@ def get_urls(movie: dict, date: str) -> tuple:
 
 
 # ─── HARDCODED LITERAL PROXY GATEWAYS ─────────────────────────────────────
-def get_mobile_proxy_url() -> str:
-    # 📱 PRIMARY GATEWAY: Your authenticated Localtonet Android Mobile phone tunnel
+def get_phone_tunnel_url() -> str:
+    # 📱 PRIMARY TUNNEL: Your authenticated Localtonet Android Mobile phone tunnel
     return "http://6dE3hOcD:jcw8aMxJ@ortzyzpusb.localtonetproxy.com:3764"
 
 def get_residential_proxy_url() -> str:
-    # 🏠 BACKUP SAFE ROUTE: Commercial India-targeted residential fallback lane
+    # 🏠 BACKUP ROUTE: Commercial India-targeted residential fallback lane
     chars = string.ascii_letters + string.digits
     rand_session = "".join(random.choice(chars) for _ in range(4))
     return f"http://gtvqr8x11k1-zone-resi-region-IN-st--city--session-{rand_session}-sessionTime-10:kOaSgFHe1bho@southasia.a1proxy.com:15136"
@@ -108,7 +108,7 @@ def get_residential_proxy_url() -> str:
 
 
 async def fetch_with_proxy(api_url: str, page_url: str, proxy_type: str) -> tuple:
-    proxy_endpoint = get_mobile_proxy_url() if proxy_type == "MOBILE" else get_residential_proxy_url()
+    proxy_endpoint = get_phone_tunnel_url() if proxy_type == "PHONE_TUNNEL" else get_residential_proxy_url()
     cfg = random.choice(HEADER_CONFIGS)
     
     api_headers = {
@@ -268,13 +268,13 @@ def _parse_api_response(resp) -> tuple:
 
 async def get_current_theaters(session: AsyncSession, page_url: str, api_url: str) -> tuple:
     # 🌟 Priority 1: Check using your authenticated local phone tunnel
-    log("  ↳ Routing through Primary Mobile Tunnel (Localtonet Phone Data)...")
-    status, theaters = await fetch_with_proxy(api_url, page_url, "MOBILE")
+    log("  ↳ Routing through Primary Phone Tunnel (Localtonet Phone Data)...")
+    status, theaters = await fetch_with_proxy(api_url, page_url, "PHONE_TUNNEL")
     if status in ("OK", "NOT_LIVE"):
         return status, theaters
 
     # 🌟 Priority 2 (Backup): Failover to the residential proxy lane only if the phone disconnects
-    log("  ↳ Primary phone pipeline down. Routing to Hardcoded Residential Backup (A1Proxy)...")
+    log("  ↳ Primary phone tunnel down. Routing to Hardcoded Residential Backup (A1Proxy)...")
     return await fetch_with_proxy(api_url, page_url, "RESIDENTIAL")
 
 
