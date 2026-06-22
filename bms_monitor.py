@@ -96,8 +96,8 @@ def get_urls(movie: dict, date: str) -> tuple:
 
 # ─── HARDCODED LITERAL PROXY GATEWAYS ─────────────────────────────────────
 def get_phone_tunnel_url() -> str:
-    # 📱 PRIMARY TUNNEL: Your authenticated Localtonet Android Mobile phone tunnel
-    return "http://6dE3hOcD:jcw8aMxJ@ortzyzpusb.localtonetproxy.com:3764"
+    # 📱 PRIMARY TUNNEL: Updated to use your newly assigned Port 2266 string array
+    return "http://6dE3hOcD:jcw8aMxJ@ortzyzpusb.localtonetproxy.com:2266"
 
 def get_residential_proxy_url() -> str:
     # 🏠 BACKUP ROUTE: Commercial India-targeted residential fallback lane
