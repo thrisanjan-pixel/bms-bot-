@@ -96,7 +96,9 @@ def get_urls(movie: dict, date: str) -> tuple:
 
 # ─── HARDCODED LITERAL PROXY GATEWAYS ─────────────────────────────────────
 def get_phone_tunnel_url() -> str:
-    return "http://6dE3hOcD:jcw8aMxJ@ortzyzpusb.localtonetproxy.com:2266"
+    # 📱 Your permanent, unlimited, free local terminal proxy link!
+    # No more 30-minute timeouts, no more 1GB caps.
+    return "https://9058e39291eb1f.lhr.life"
 
 def get_residential_proxy_url() -> str:
     chars = string.ascii_letters + string.digits
