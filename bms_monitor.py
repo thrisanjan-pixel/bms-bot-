@@ -96,8 +96,8 @@ def get_urls(movie: dict, date: str) -> tuple:
 
 # ─── HARDCODED LITERAL PROXY GATEWAYS ─────────────────────────────────────
 def get_mobile_proxy_url() -> str:
-    # 📱 PRIMARY GATEWAY: Your DIY Android Mobile Phone Proxy Server via Localtonet
-    return "http://ortzyzpusb.localtonetproxy.com:3764"
+    # 📱 PRIMARY GATEWAY: Your authenticated Localtonet Android Mobile phone tunnel
+    return "http://6dE3hOcD:jcw8aMxJ@ortzyzpusb.localtonetproxy.com:3764"
 
 def get_residential_proxy_url() -> str:
     # 🏠 BACKUP SAFE ROUTE: Commercial India-targeted residential fallback lane
@@ -267,7 +267,7 @@ def _parse_api_response(resp) -> tuple:
 
 
 async def get_current_theaters(session: AsyncSession, page_url: str, api_url: str) -> tuple:
-    # 🌟 Priority 1: Check using your local phone tunnel
+    # 🌟 Priority 1: Check using your authenticated local phone tunnel
     log("  ↳ Routing through Primary Mobile Tunnel (Localtonet Phone Data)...")
     status, theaters = await fetch_with_proxy(api_url, page_url, "MOBILE")
     if status in ("OK", "NOT_LIVE"):
