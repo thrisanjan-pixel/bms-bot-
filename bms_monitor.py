@@ -96,9 +96,8 @@ def get_urls(movie: dict, date: str) -> tuple:
 
 # ─── HARDCODED LITERAL PROXY GATEWAYS ─────────────────────────────────────
 def get_phone_tunnel_url() -> str:
-    # 📱 Your permanent, unlimited, free local terminal proxy link!
-    # No more 30-minute timeouts, no more 1GB caps.
-    return "https://9058e39291eb1f.lhr.life"
+    # 📱 Your live Pinggy proxy tunnel routing directly through your phone data!
+    return "http://rpsfahqzwb.a.pinggy.link:24335"
 
 def get_residential_proxy_url() -> str:
     chars = string.ascii_letters + string.digits
@@ -108,7 +107,6 @@ def get_residential_proxy_url() -> str:
 
 
 async def fetch_with_proxy(phone_session: AsyncSession, resi_session: AsyncSession, api_url: str, page_url: str, proxy_type: str) -> tuple:
-    # Selects the warm, persistent session instead of generating a new one
     session = phone_session if proxy_type == "PHONE_TUNNEL" else resi_session
     cfg = random.choice(HEADER_CONFIGS)
     
@@ -305,7 +303,6 @@ async def process_movie_date(phone_session: AsyncSession, resi_session: AsyncSes
 
 
 async def main_async():
-    # 🌟 Warm persistent network connections generated once during startup orchestration
     async with AsyncSession(impersonate="chrome110", proxy=get_phone_tunnel_url()) as phone_session, \
                AsyncSession(impersonate="chrome110", proxy=get_residential_proxy_url()) as resi_session:
                
