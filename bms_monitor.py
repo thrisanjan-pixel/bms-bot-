@@ -96,19 +96,18 @@ def get_urls(movie: dict, date: str) -> tuple:
 
 # ─── HARDCODED LITERAL PROXY GATEWAYS ─────────────────────────────────────
 def get_phone_tunnel_url() -> str:
-    # 📱 PRIMARY TUNNEL: Updated to use your newly assigned Port 2266 string array
     return "http://6dE3hOcD:jcw8aMxJ@ortzyzpusb.localtonetproxy.com:2266"
 
 def get_residential_proxy_url() -> str:
-    # 🏠 BACKUP ROUTE: Commercial India-targeted residential fallback lane
     chars = string.ascii_letters + string.digits
     rand_session = "".join(random.choice(chars) for _ in range(4))
     return f"http://gtvqr8x11k1-zone-resi-region-IN-st--city--session-{rand_session}-sessionTime-10:kOaSgFHe1bho@southasia.a1proxy.com:15136"
 # ──────────────────────────────────────────────────────────────────────────
 
 
-async def fetch_with_proxy(api_url: str, page_url: str, proxy_type: str) -> tuple:
-    proxy_endpoint = get_phone_tunnel_url() if proxy_type == "PHONE_TUNNEL" else get_residential_proxy_url()
+async def fetch_with_proxy(phone_session: AsyncSession, resi_session: AsyncSession, api_url: str, page_url: str, proxy_type: str) -> tuple:
+    # Selects the warm, persistent session instead of generating a new one
+    session = phone_session if proxy_type == "PHONE_TUNNEL" else resi_session
     cfg = random.choice(HEADER_CONFIGS)
     
     api_headers = {
@@ -124,19 +123,17 @@ async def fetch_with_proxy(api_url: str, page_url: str, proxy_type: str) -> tupl
     }
     
     try:
-        async with AsyncSession(impersonate="chrome110") as session:
-            resp = await session.get(
-                api_url,
-                headers=api_headers,
-                proxy=proxy_endpoint,
-                timeout=7
-            )
-            status, theaters = _parse_api_response(resp)
-            if status == "OK":
-                log(f"   [{proxy_type}] Routing breakthrough confirmed — Response: HTTP 200")
-            elif status == "BLOCKED":
-                log(f"   ⚠️ [{proxy_type}] Gateway rate-limited or blocked — Response: HTTP {resp.status_code}")
-            return status, theaters
+        resp = await session.get(
+            api_url,
+            headers=api_headers,
+            timeout=7
+        )
+        status, theaters = _parse_api_response(resp)
+        if status == "OK":
+            log(f"   [{proxy_type}] Routing breakthrough confirmed — Response: HTTP 200")
+        elif status == "BLOCKED":
+            log(f"   ⚠️ [{proxy_type}] Gateway rate-limited or blocked — Response: HTTP {resp.status_code}")
+        return status, theaters
     except Exception as e:
         log(f"   ❌ [{proxy_type}] Transport gateway error: {e}")
         return "ERROR", set()
@@ -148,14 +145,9 @@ async def send_telegram(message: str) -> bool:
     try:
         async with AsyncSession(impersonate="chrome110") as session:
             resp = await session.post(api_url, json=payload, timeout=10)
-            if resp.status_code == 200:
-                log("📲 Telegram notification link verified.")
-                return True
-            else:
-                log(f"❌ Telegram transmission failure. Code: {resp.status_code}")
-                return False
+            return resp.status_code == 200
     except Exception as e:
-        log(f"❌ Telegram transmission error: {e}")
+        log(f"❌ Telegram transmission failure: {e}")
         return False
 
 
@@ -170,11 +162,7 @@ async def send_email(subject: str, html_body: str) -> bool:
                 json={"from": f"BMS Bot <{EMAIL_FROM}>", "to": [EMAIL_TO], "subject": subject, "html": html_body},
                 timeout=15,
             )
-            if resp.status_code in (200, 201):
-                return True
-            else:
-                log(f"❌ Resend API drop encountered. Status: {resp.status_code}")
-                return False
+            return resp.status_code in (200, 201)
     except Exception as e:
         log(f"❌ Email transport system error: {e}")
         return False
@@ -266,19 +254,17 @@ def _parse_api_response(resp) -> tuple:
     return "NOT_LIVE", set()
 
 
-async def get_current_theaters(session: AsyncSession, page_url: str, api_url: str) -> tuple:
-    # 🌟 Priority 1: Check using your authenticated local phone tunnel
+async def get_current_theaters(phone_session: AsyncSession, resi_session: AsyncSession, page_url: str, api_url: str) -> tuple:
     log("  ↳ Routing through Primary Phone Tunnel (Localtonet Phone Data)...")
-    status, theaters = await fetch_with_proxy(api_url, page_url, "PHONE_TUNNEL")
+    status, theaters = await fetch_with_proxy(phone_session, resi_session, api_url, page_url, "PHONE_TUNNEL")
     if status in ("OK", "NOT_LIVE"):
         return status, theaters
 
-    # 🌟 Priority 2 (Backup): Failover to the residential proxy lane only if the phone disconnects
     log("  ↳ Primary phone tunnel down. Routing to Hardcoded Residential Backup (A1Proxy)...")
-    return await fetch_with_proxy(api_url, page_url, "RESIDENTIAL")
+    return await fetch_with_proxy(phone_session, resi_session, api_url, page_url, "RESIDENTIAL")
 
 
-async def process_movie_date(session: AsyncSession, semaphore: asyncio.Semaphore, movie: dict, target_date: str) -> bool:
+async def process_movie_date(phone_session: AsyncSession, resi_session: AsyncSession, semaphore: asyncio.Semaphore, movie: dict, target_date: str) -> bool:
     async with semaphore:
         await asyncio.sleep(random.uniform(0.2, 1.0))
         page_url, _, api_url = get_urls(movie, target_date)
@@ -287,7 +273,7 @@ async def process_movie_date(session: AsyncSession, semaphore: asyncio.Semaphore
         
         is_first_run = is_state_key_missing(movie["code"], target_date)
         known_theaters = load_known_theaters(movie["code"], target_date)
-        status, current_theaters = await get_current_theaters(session, page_url, api_url)
+        status, current_theaters = await get_current_theaters(phone_session, resi_session, page_url, api_url)
 
         if status == "OK":
             new_theaters = current_theaters - known_theaters
@@ -317,59 +303,61 @@ async def process_movie_date(session: AsyncSession, semaphore: asyncio.Semaphore
 
 
 async def main_async():
-    session = AsyncSession(impersonate="chrome110")
-    log("=" * 60)
-    log(f"🎬 Internalized Hardcoded Proxy BookMyShow Monitor Active")
-    log(f"   Bypassing environment system. Pure code array matrix lookups active.")
-    log("=" * 60)
+    # 🌟 Warm persistent network connections generated once during startup orchestration
+    async with AsyncSession(impersonate="chrome110", proxy=get_phone_tunnel_url()) as phone_session, \
+               AsyncSession(impersonate="chrome110", proxy=get_residential_proxy_url()) as resi_session:
+               
+        log("=" * 60)
+        log(f"🎬 Optimized Persistent Connection Proxy Monitor Active")
+        log(f"   HTTP Keep-Alive enabled. Slicing TLS handshake overhead metrics.")
+        log("=" * 60)
 
-    for movie in MOVIES:
-        movie_name = movie["name"]
-        dates_to_track = get_dates_to_track(movie)
-        page_url, _, _ = get_urls(movie, dates_to_track[0])
-        readable_dates = ", ".join([datetime.datetime.strptime(d, "%Y%m%d").strftime("%b %d") for d in dates_to_track])
-        
-        startup_alert = (
-            f"🚀 <b>BMS Hardcoded Monitor Online!</b>\n\n"
-            f"🎬 <b>Movie:</b> {movie_name}\n"
-            f"📅 <b>Horizon Map:</b> {readable_dates}\n\n"
-            f"🛡️ Internal connection array loaded successfully.\n\n"
-            f"👉 <a href='{page_url}'>OPEN BOOKING PAGE →</a>"
-        )
-        await notify(startup_alert, email_subject=f"🚀 BMS Hardcoded Monitor Online: {movie_name}")
-
-    check_count = 0
-    consecutive_failures = 0
-    
-    while True:
-        check_count += 1
-        log(f"Matrix Sweep Check #{check_count} starting...")
-        
-        semaphore = asyncio.Semaphore(1)  
-        tasks = []
         for movie in MOVIES:
-            for target_date in get_dates_to_track(movie):
-                tasks.append(process_movie_date(session, semaphore, movie, target_date))
-        
-        results = await asyncio.gather(*tasks)
-        
-        if results and all(res is False for res in results):
-            consecutive_failures += 1
-            log(f"⚠️ Entire matrix sweep missed. Consecutive failure counter: {consecutive_failures}/5")
+            movie_name = movie["name"]
+            dates_to_track = get_dates_to_track(movie)
+            page_url, _, _ = get_urls(movie, dates_to_track[0])
+            readable_dates = ", ".join([datetime.datetime.strptime(d, "%Y%m%d").strftime("%b %d") for d in dates_to_track])
             
-            if consecutive_failures >= 5:
-                fail_alert = (
-                    f"⚠️ <b>CRITICAL: BMS TRACKER CLUSTER DOWN!</b>\n\n"
-                    f"The daemon has dropped 5 tracking passes consecutively.\n"
-                    f"Both internal mobile and residential clusters are reporting authentication blocks.\n\n"
-                    f"💡 <b>Action Required:</b> Data allowances on proxy platforms may be spent."
-                )
-                await notify(fail_alert, email_subject="⚠️ CRITICAL ERROR: BMS Tracker Failing")
+            startup_alert = (
+                f"🚀 <b>BMS Optimized Monitor Online!</b>\n\n"
+                f"🎬 <b>Movie:</b> {movie_name}\n"
+                f"📅 <b>Horizon Map:</b> {readable_dates}\n\n"
+                f"👉 <a href='{page_url}'>OPEN BOOKING PAGE →</a>"
+            )
+            await notify(startup_alert, email_subject=f"🚀 BMS Hardcoded Monitor Online: {movie_name}")
+
+        check_count = 0
+        consecutive_failures = 0
+        
+        while True:
+            check_count += 1
+            log(f"Matrix Sweep Check #{check_count} starting...")
+            
+            semaphore = asyncio.Semaphore(1)  
+            tasks = []
+            for movie in MOVIES:
+                for target_date in get_dates_to_track(movie):
+                    tasks.append(process_movie_date(phone_session, resi_session, semaphore, movie, target_date))
+            
+            results = await asyncio.gather(*tasks)
+            
+            if results and all(res is False for res in results):
+                consecutive_failures += 1
+                log(f"⚠️ Entire matrix sweep missed. Consecutive failure counter: {consecutive_failures}/5")
+                
+                if consecutive_failures >= 5:
+                    fail_alert = (
+                        f"⚠️ <b>CRITICAL: BMS TRACKER CLUSTER DOWN!</b>\n\n"
+                        f"The daemon has dropped 5 tracking passes consecutively.\n"
+                        f"Both internal mobile and residential clusters are reporting authentication blocks.\n\n"
+                        f"💡 <b>Action Required:</b> Data allowances on proxy platforms may be spent."
+                    )
+                    await notify(fail_alert, email_subject="⚠️ CRITICAL ERROR: BMS Tracker Failing")
+                    consecutive_failures = 0  
+            else:
                 consecutive_failures = 0  
-        else:
-            consecutive_failures = 0  
-            
-        await asyncio.sleep(BASE_CHECK_INTERVAL + random.randint(5, 15))
+                
+            await asyncio.sleep(BASE_CHECK_INTERVAL + random.randint(5, 15))
 
 
 if __name__ == "__main__":
