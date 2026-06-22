@@ -51,6 +51,10 @@ MOVIES = [
 STATE_DIR  = os.environ.get("STATE_DIR", "/data" if os.path.isdir("/data") else ".")
 STATE_FILE = os.path.join(STATE_DIR, "known_theaters.json")
 
+# 📊 GLOBAL TRACKING METRICS FOR TELEGRAM STATUS STATUS COMMANDS
+TOTAL_SWEEPS    = 0
+LAST_USED_PROXY = "Determining status on next sweep..."
+
 HEADER_CONFIGS = [
     {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
@@ -100,13 +104,15 @@ def get_phone_tunnel_url() -> str:
     return "http://rpsfahqzwb.a.pinggy.link:24335"
 
 def get_residential_proxy_url() -> str:
+    # 🛡️ Your backup regional residential proxy pool
     chars = string.ascii_letters + string.digits
     rand_session = "".join(random.choice(chars) for _ in range(4))
-    return f"http://gtvqr8x11k1-zone-resi-region-IN-st--city--session-{rand_session}-sessionTime-10:kOaSgFHe1bho@southasia.a1proxy.com:15136"
+    return f"http://ing0dcn3bdw16f5-zone-resi-region-IN-st--city--session-{rand_session}-sessionTime-10:hK8YUQQ@southasia.a1proxy.com:15128"
 # ──────────────────────────────────────────────────────────────────────────
 
 
 async def fetch_with_proxy(phone_session: AsyncSession, resi_session: AsyncSession, api_url: str, page_url: str, proxy_type: str) -> tuple:
+    global LAST_USED_PROXY
     session = phone_session if proxy_type == "PHONE_TUNNEL" else resi_session
     cfg = random.choice(HEADER_CONFIGS)
     
@@ -131,8 +137,14 @@ async def fetch_with_proxy(phone_session: AsyncSession, resi_session: AsyncSessi
         status, theaters = _parse_api_response(resp)
         if status == "OK":
             log(f"   [{proxy_type}] Routing breakthrough confirmed — Response: HTTP 200")
+            # Cache the successful proxy classification identifier
+            LAST_USED_PROXY = "🟢 Proxy 1: Phone Tunnel (Pinggy Data)" if proxy_type == "PHONE_TUNNEL" else "🔵 Proxy 2: Residential Backup (A1Proxy)"
         elif status == "BLOCKED":
             log(f"   ⚠️ [{proxy_type}] Gateway rate-limited or blocked — Response: HTTP {resp.status_code}")
+        elif status == "NOT_LIVE":
+            # Structure parsed cleanly but no active listings found
+            LAST_USED_PROXY = "🟢 Proxy 1: Phone Tunnel (Pinggy Data)" if proxy_type == "PHONE_TUNNEL" else "🔵 Proxy 2: Residential Backup (A1Proxy)"
+            
         return status, theaters
     except Exception as e:
         log(f"   ❌ [{proxy_type}] Transport gateway error: {e}")
@@ -149,6 +161,52 @@ async def send_telegram(message: str) -> bool:
     except Exception as e:
         log(f"❌ Telegram transmission failure: {e}")
         return False
+
+
+# ─── 📬 NEW INTERACTIVE INCOMING TELEGRAM COMMAND LISTENER ─────────────────
+async def telegram_listener():
+    """Listens continuously in the background for health verification commands from you."""
+    global LAST_USED_PROXY, TOTAL_SWEEPS
+    offset = 0
+    log("📬 Telegram Status Monitor Initialized. Standing by for commands...")
+    
+    async with AsyncSession(impersonate="chrome110") as session:
+        while True:
+            try:
+                url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates?offset={offset}&timeout=5"
+                resp = await session.get(url, timeout=10)
+                
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data.get("ok") and data.get("result"):
+                        for update in data["result"]:
+                            offset = update["update_id"] + 1
+                            message = update.get("message")
+                            if not message:
+                                continue
+                            
+                            sender_chat_id = str(message.get("chat", {}).get("id"))
+                            text = message.get("text", "").strip().lower()
+                            
+                            # SECURITY CHECK: Only answer if the request comes from YOUR unique Chat ID
+                            if sender_chat_id == str(CHAT_ID):
+                                if text in ["alive", "status", "/status", "ping", "proxy"]:
+                                    log(f"📥 Received live health request from user: '{text}'")
+                                    
+                                    time_stamp = datetime.datetime.now().strftime("%I:%M %p")
+                                    reply_msg = (
+                                        f"❤️ <b>🤖 SERVER CLUSTER HEALTH STATUS</b>\n\n"
+                                        f"• ⏱️ <b>Ping Time:</b> {time_stamp}\n"
+                                        f"• 🔄 <b>Total Sweeps:</b> {TOTAL_SWEEPS} loops\n"
+                                        f"• 🔌 <b>Active Channel:</b> {LAST_USED_PROXY}\n\n"
+                                        f"🍿 <i>Status: Cloud engine active and scanning the matrix grids.</i>"
+                                    )
+                                    await send_telegram(reply_msg)
+            except Exception:
+                # Catch temporary network drops silently so background monitoring isn't broken
+                pass
+            await asyncio.sleep(2)
+# ──────────────────────────────────────────────────────────────────────────
 
 
 async def send_email(subject: str, html_body: str) -> bool:
@@ -303,6 +361,7 @@ async def process_movie_date(phone_session: AsyncSession, resi_session: AsyncSes
 
 
 async def main_async():
+    global TOTAL_SWEEPS
     async with AsyncSession(impersonate="chrome110", proxy=get_phone_tunnel_url()) as phone_session, \
                AsyncSession(impersonate="chrome110", proxy=get_residential_proxy_url()) as resi_session:
                
@@ -310,6 +369,9 @@ async def main_async():
         log(f"🎬 Optimized Persistent Connection Proxy Monitor Active")
         log(f"   HTTP Keep-Alive enabled. Slicing TLS handshake overhead metrics.")
         log("=" * 60)
+
+        # 🌟 SPIN UP THE TELEGRAM INCOMING COMMAND THREAD CONCURRENTLY
+        asyncio.create_task(telegram_listener())
 
         for movie in MOVIES:
             movie_name = movie["name"]
@@ -321,6 +383,7 @@ async def main_async():
                 f"🚀 <b>BMS Optimized Monitor Online!</b>\n\n"
                 f"🎬 <b>Movie:</b> {movie_name}\n"
                 f"📅 <b>Horizon Map:</b> {readable_dates}\n\n"
+                f"💬 <i>Send me 'status' or 'alive' at any time to verify system health and active proxies.</i>\n\n"
                 f"👉 <a href='{page_url}'>OPEN BOOKING PAGE →</a>"
             )
             await notify(startup_alert, email_subject=f"🚀 BMS Hardcoded Monitor Online: {movie_name}")
@@ -330,6 +393,7 @@ async def main_async():
         
         while True:
             check_count += 1
+            TOTAL_SWEEPS = check_count # Synchronize state counter for Telegram diagnostic replies
             log(f"Matrix Sweep Check #{check_count} starting...")
             
             semaphore = asyncio.Semaphore(1)  
