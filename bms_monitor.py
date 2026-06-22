@@ -96,11 +96,9 @@ def get_urls(movie: dict, date: str) -> tuple:
 
 # ─── HARDCODED LITERAL PROXY GATEWAYS ─────────────────────────────────────
 def get_mobile_proxy_url() -> str:
-    # 📱 Production Mobile Gateway locked to your verified target endpoint loop string
     return "http://h8u0zfbivg-corp.mobile.res-country-IN-hold-session-session-6a3839e1e4c79:2oQ5S7OlC7oDbCMG@109.236.82.42:443"
 
 def get_residential_proxy_url() -> str:
-    # 🏠 Brand New Port 15136 India-targeted residential route with dynamic auto-rotation
     chars = string.ascii_letters + string.digits
     rand_session = "".join(random.choice(chars) for _ in range(4))
     return f"http://gtvqr8x11k1-zone-resi-region-IN-st--city--session-{rand_session}-sessionTime-10:kOaSgFHe1bho@southasia.a1proxy.com:15136"
@@ -148,7 +146,12 @@ async def send_telegram(message: str) -> bool:
     try:
         async with AsyncSession(impersonate="chrome110") as session:
             resp = await session.post(api_url, json=payload, timeout=10)
-            return resp.status_code == 200
+            if resp.status_code == 200:
+                log("📲 Telegram startup handshake confirmed.")
+                return True
+            else:
+                log(f"❌ Telegram rejected token dispatch. Code: {resp.status_code}, Response: {resp.text}")
+                return False
     except Exception as e:
         log(f"❌ Telegram transmission failure: {e}")
         return False
@@ -165,9 +168,14 @@ async def send_email(subject: str, html_body: str) -> bool:
                 json={"from": f"BMS Bot <{EMAIL_FROM}>", "to": [EMAIL_TO], "subject": subject, "html": html_body},
                 timeout=15,
             )
-            return resp.status_code in (200, 201)
+            if resp.status_code in (200, 201):
+                log(f"📧 Startup alert dispatched successfully to Resend pipeline for {EMAIL_TO}.")
+                return True
+            else:
+                log(f"❌ Resend API Error. Status Code: {resp.status_code}, Context: {resp.text}")
+                return False
     except Exception as e:
-        log(f"❌ Email transport system error: {e}")
+        log(f"❌ Email transport system exception error: {e}")
         return False
 
 
