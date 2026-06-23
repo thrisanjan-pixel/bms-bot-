@@ -27,14 +27,14 @@ BASE_CHECK_INTERVAL = 45
 MOVIES = [
     {
         "name": "Spider-Man: Brand New Day",
-        "default_code": "ET00502600",      # Acts purely as a fallback fail-safe now
+        "default_code": "ET00502600",
         "slug": "spider-man-brand-new-day",
         "start_date": "20260730",  
         "days_to_track": 3         
     },
     {
         "name": "Supergirl",
-        "default_code": "ET00501636",      # Old code acts purely as a backup fallback
+        "default_code": "ET00501636",      
         "slug": "supergirl",
         "start_date": "20260626",  
         "days_to_track": 3         
@@ -96,9 +96,9 @@ def get_urls(movie: dict, date: str, active_code: str) -> tuple:
     return page_url, info_page_url, api_url
 
 
-# ─── 🔍 NEW AUTO-DISCOVERY CODE LOOKUP ENGINE ────────────────────────────
+# ─── 🛠️ UPGRADED ADVANCED PROXIMITY DISCOVERY SCANNER ────────────────────
 async def discover_event_code(session: AsyncSession, city_slug: str, slug: str, fallback_code: str) -> str:
-    """Queries the main city directory page to scrape the current code assigned to the slug."""
+    """Scans full page source block matrices to locate event keys near target slugs."""
     url = f"https://in.bookmyshow.com/{city_slug.lower()}/movies"
     cfg = random.choice(HEADER_CONFIGS)
     headers = {
@@ -110,26 +110,21 @@ async def discover_event_code(session: AsyncSession, city_slug: str, slug: str, 
         resp = await session.get(url, headers=headers, timeout=8)
         if resp.status_code == 200:
             text = resp.text
+            slug_idx = text.lower().find(slug.lower())
             
-            # Pattern A: Standard links like /movies/hyderabad/supergirl/ET00475569
-            pattern_url = f"movies/{city_slug.lower()}/{slug}/(ET[0-9A-Z]+)"
-            match_url = re.search(pattern_url, text, re.IGNORECASE)
-            if match_url:
-                return match_url.group(1).upper()
-            
-            # Pattern B: Secondary metadata structures /supergirl/ET00475569
-            pattern_meta = f"/{slug}/(ET[0-9A-Z]+)"
-            match_meta = re.search(pattern_meta, text, re.IGNORECASE)
-            if match_meta:
-                return match_meta.group(1).upper()
+            # If slug is present anywhere (including JSON blocks), parse the surrounding window zone
+            if slug_idx != -1:
+                search_window = text[max(0, slug_idx - 300):min(len(text), slug_idx + 1500)]
+                et_match = re.search(r'(ET[0-9]+)', search_window)
+                if et_match:
+                    detected_code = et_match.group(1).upper()
+                    return detected_code
     except Exception:
         pass
-        
-    return fallback_code # Safely drop back to defaults if page fails or movie isn't indexed yet
+    return fallback_code 
 # ──────────────────────────────────────────────────────────────────────────
 
 
-# ─── HARDCODED LITERAL PROXY GATEWAYS ─────────────────────────────────────
 def get_phone_tunnel_url() -> str:
     return "http://rpsfahqzwb.a.pinggy.link:24335"
 
@@ -137,7 +132,6 @@ def get_residential_proxy_url() -> str:
     chars = string.ascii_letters + string.digits
     rand_session = "".join(random.choice(chars) for _ in range(4))
     return f"http://ing0dcn3bdw16f5-zone-resi-region-IN-st--city--session-{rand_session}-sessionTime-10:hK8YUQQ@southasia.a1proxy.com:15128"
-# ──────────────────────────────────────────────────────────────────────────
 
 
 async def fetch_with_proxy(phone_session: AsyncSession, resi_session: AsyncSession, api_url: str, page_url: str, proxy_type: str) -> tuple:
@@ -158,11 +152,7 @@ async def fetch_with_proxy(phone_session: AsyncSession, resi_session: AsyncSessi
     }
     
     try:
-        resp = await session.get(
-            api_url,
-            headers=api_headers,
-            timeout=7
-        )
+        resp = await session.get(api_url, headers=api_headers, timeout=7)
         status, theaters = _parse_api_response(resp)
         if status == "OK":
             log(f"   [{proxy_type}] Routing breakthrough confirmed — Response: HTTP 200")
@@ -216,7 +206,6 @@ async def telegram_listener():
                             if sender_chat_id == str(CHAT_ID):
                                 if text in ["alive", "status", "/status", "ping", "proxy"]:
                                     log(f"📥 Received live health request from user: '{text}'")
-                                    
                                     time_stamp = datetime.datetime.now().strftime("%I:%M %p")
                                     reply_msg = (
                                         f"❤️ <b>🤖 SERVER CLUSTER HEALTH STATUS</b>\n\n"
@@ -353,8 +342,17 @@ async def process_movie_date(phone_session: AsyncSession, resi_session: AsyncSes
         if status == "OK":
             new_theaters = current_theaters - known_theaters
             if new_theaters:
+                # 🛠️ FORCED INITIAL ALERT: If tickets are already live when the server fires up, push a summary instead of staying silent!
                 if is_first_run and check_count == 1:
-                    log(f"      📥 [Silent Init] Cached baseline grid snapshot ({len(current_theaters)} nodes) for {movie['name']}.")
+                    theater_list = "\n".join(f"• {t}" for t in sorted(current_theaters))
+                    alert_msg = (
+                        f"📥 <b>BMS CLUSTER ONLINE — CURRENT OPEN TRACKS FOUND!</b>\n\n"
+                        f"🎬 <b>{movie['name']}</b>\n"
+                        f"📅 Date: <b>{human_date}</b>\n\n"
+                        f"<b>Active Venues Detected:</b>\n{theater_list}\n\n"
+                        f"👉 <a href='{page_url}'>SECURE SEATS NOW →</a>"
+                    )
+                    await notify(alert_msg, email_subject=f"📥 TRACKER INITIALIZED: {movie['name'].upper()} LIVE")
                 else:
                     theater_list = "\n".join(f"• {t}" for t in sorted(new_theaters))
                     alert_msg = (
@@ -389,20 +387,6 @@ async def main_async():
 
         asyncio.create_task(telegram_listener())
 
-        for movie in MOVIES:
-            movie_name = movie["name"]
-            dates_to_track = get_dates_to_track(movie)
-            page_url, _, _ = get_urls(movie, dates_to_track[0], movie["default_code"])
-            readable_dates = ", ".join([datetime.datetime.strptime(d, "%Y%m%d").strftime("%b %d") for d in dates_to_track])
-            
-            startup_alert = (
-                f"🚀 <b>BMS Independent Monitor Online!</b>\n\n"
-                f"🎬 <b>Movie:</b> {movie_name}\n"
-                f"📅 <b>Horizon Map:</b> {readable_dates}\n\n"
-                f"👉 <a href='{page_url}'>OPEN BOOKING PAGE →</a>"
-            )
-            await notify(startup_alert, email_subject=f"🚀 BMS Independent Monitor Online: {movie_name}")
-
         check_count = 0
         consecutive_failures = 0
         
@@ -411,7 +395,6 @@ async def main_async():
             TOTAL_SWEEPS = check_count
             log(f"Matrix Sweep Check #{check_count} starting...")
             
-            # Resolve live active codes dynamically once per movie for this cycle loop
             resolved_codes = {}
             for movie in MOVIES:
                 slug = movie["slug"]
