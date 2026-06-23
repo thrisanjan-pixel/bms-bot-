@@ -27,21 +27,21 @@ BASE_CHECK_INTERVAL = 45
 MOVIES = [
     {
         "name": "Spider-Man: Brand New Day",
-        "code": "ET00502600",
+        "default_code": "ET00502600",      # Acts purely as a fallback fail-safe now
         "slug": "spider-man-brand-new-day",
         "start_date": "20260730",  
         "days_to_track": 3         
     },
     {
         "name": "Supergirl",
-        "code": "ET00501636",      
+        "default_code": "ET00501636",      # Old code acts purely as a backup fallback
         "slug": "supergirl",
         "start_date": "20260626",  
         "days_to_track": 3         
     },
     {
         "name": "The Odyssey",
-        "code": "ET00452034",
+        "default_code": "ET00452034",
         "slug": "the-odyssey",
         "start_date": "20260717",  
         "days_to_track": 3         
@@ -51,7 +51,6 @@ MOVIES = [
 STATE_DIR  = os.environ.get("STATE_DIR", "/data" if os.path.isdir("/data") else ".")
 STATE_FILE = os.path.join(STATE_DIR, "known_theaters.json")
 
-# 📊 GLOBAL TRACKING METRICS FOR TELEGRAM STATUS STATUS COMMANDS
 TOTAL_SWEEPS    = 0
 LAST_USED_PROXY = "Determining status on next sweep..."
 
@@ -84,27 +83,57 @@ def get_dates_to_track(movie: dict) -> list:
     return [(effective_start + datetime.timedelta(days=i)).strftime("%Y%m%d") for i in range(days)]
 
 
-def get_urls(movie: dict, date: str) -> tuple:
+def get_urls(movie: dict, date: str, active_code: str) -> tuple:
     slug = movie["slug"]
-    code = movie["code"]
-    page_url = f"https://in.bookmyshow.com/movies/hyderabad/{slug}/buytickets/{code}/{date}"
-    info_page_url = f"https://in.bookmyshow.com/movies/hyderabad/{slug}/{code}"
+    page_url = f"https://in.bookmyshow.com/movies/hyderabad/{slug}/buytickets/{active_code}/{date}"
+    info_page_url = f"https://in.bookmyshow.com/movies/hyderabad/{slug}/{active_code}"
     api_url = (
         f"https://in.bookmyshow.com/api/movies-data/showtimes-by-event"
         f"?appCode=MOBAND2&appVersion=14.3.4&language=en"
-        f"&eventCode={code}&regionCode={CITY_CODE}&subRegion={CITY_CODE}"
+        f"&eventCode={active_code}&regionCode={CITY_CODE}&subRegion={CITY_CODE}"
         f"&bmsId=1.21.69&token=67x1xa33b4x422b361ba&dateCode={date}&availability=1"
     )
     return page_url, info_page_url, api_url
 
 
+# ─── 🔍 NEW AUTO-DISCOVERY CODE LOOKUP ENGINE ────────────────────────────
+async def discover_event_code(session: AsyncSession, city_slug: str, slug: str, fallback_code: str) -> str:
+    """Queries the main city directory page to scrape the current code assigned to the slug."""
+    url = f"https://in.bookmyshow.com/{city_slug.lower()}/movies"
+    cfg = random.choice(HEADER_CONFIGS)
+    headers = {
+        "User-Agent": cfg["User-Agent"],
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Referer": "https://in.bookmyshow.com/",
+    }
+    try:
+        resp = await session.get(url, headers=headers, timeout=8)
+        if resp.status_code == 200:
+            text = resp.text
+            
+            # Pattern A: Standard links like /movies/hyderabad/supergirl/ET00475569
+            pattern_url = f"movies/{city_slug.lower()}/{slug}/(ET[0-9A-Z]+)"
+            match_url = re.search(pattern_url, text, re.IGNORECASE)
+            if match_url:
+                return match_url.group(1).upper()
+            
+            # Pattern B: Secondary metadata structures /supergirl/ET00475569
+            pattern_meta = f"/{slug}/(ET[0-9A-Z]+)"
+            match_meta = re.search(pattern_meta, text, re.IGNORECASE)
+            if match_meta:
+                return match_meta.group(1).upper()
+    except Exception:
+        pass
+        
+    return fallback_code # Safely drop back to defaults if page fails or movie isn't indexed yet
+# ──────────────────────────────────────────────────────────────────────────
+
+
 # ─── HARDCODED LITERAL PROXY GATEWAYS ─────────────────────────────────────
 def get_phone_tunnel_url() -> str:
-    # 📱 Your live Pinggy proxy tunnel routing directly through your phone data!
     return "http://rpsfahqzwb.a.pinggy.link:24335"
 
 def get_residential_proxy_url() -> str:
-    # 🛡️ Your backup regional residential proxy pool
     chars = string.ascii_letters + string.digits
     rand_session = "".join(random.choice(chars) for _ in range(4))
     return f"http://ing0dcn3bdw16f5-zone-resi-region-IN-st--city--session-{rand_session}-sessionTime-10:hK8YUQQ@southasia.a1proxy.com:15128"
@@ -137,12 +166,10 @@ async def fetch_with_proxy(phone_session: AsyncSession, resi_session: AsyncSessi
         status, theaters = _parse_api_response(resp)
         if status == "OK":
             log(f"   [{proxy_type}] Routing breakthrough confirmed — Response: HTTP 200")
-            # Cache the successful proxy classification identifier
             LAST_USED_PROXY = "🟢 Proxy 1: Phone Tunnel (Pinggy Data)" if proxy_type == "PHONE_TUNNEL" else "🔵 Proxy 2: Residential Backup (A1Proxy)"
         elif status == "BLOCKED":
             log(f"   ⚠️ [{proxy_type}] Gateway rate-limited or blocked — Response: HTTP {resp.status_code}")
         elif status == "NOT_LIVE":
-            # Structure parsed cleanly but no active listings found
             LAST_USED_PROXY = "🟢 Proxy 1: Phone Tunnel (Pinggy Data)" if proxy_type == "PHONE_TUNNEL" else "🔵 Proxy 2: Residential Backup (A1Proxy)"
             
         return status, theaters
@@ -163,9 +190,7 @@ async def send_telegram(message: str) -> bool:
         return False
 
 
-# ─── 📬 NEW INTERACTIVE INCOMING TELEGRAM COMMAND LISTENER ─────────────────
 async def telegram_listener():
-    """Listens continuously in the background for health verification commands from you."""
     global LAST_USED_PROXY, TOTAL_SWEEPS
     offset = 0
     log("📬 Telegram Status Monitor Initialized. Standing by for commands...")
@@ -188,7 +213,6 @@ async def telegram_listener():
                             sender_chat_id = str(message.get("chat", {}).get("id"))
                             text = message.get("text", "").strip().lower()
                             
-                            # SECURITY CHECK: Only answer if the request comes from YOUR unique Chat ID
                             if sender_chat_id == str(CHAT_ID):
                                 if text in ["alive", "status", "/status", "ping", "proxy"]:
                                     log(f"📥 Received live health request from user: '{text}'")
@@ -203,10 +227,8 @@ async def telegram_listener():
                                     )
                                     await send_telegram(reply_msg)
             except Exception:
-                # Catch temporary network drops silently so background monitoring isn't broken
                 pass
             await asyncio.sleep(2)
-# ──────────────────────────────────────────────────────────────────────────
 
 
 async def send_email(subject: str, html_body: str) -> bool:
@@ -245,16 +267,11 @@ def is_state_key_missing(event_code: str, date: str) -> bool:
 
 def load_known_theaters(event_code: str, date: str) -> set:
     state_key = f"{event_code}##{date}"
-    baselines = {
-        "Cinepolis: TNR North City, Suchitra, Hyderabad",
-        "PVR Lakeshore PXL 4K Laser ATMOS DTS-X Y Junction",
-        "PVR Superplex Inorbit: LUXE, PXL, 4K, 4DX: Cyberabad"
-    }
     try:
         with open(STATE_FILE, "r") as f:
-            return set(json.load(f).get(state_key, [])) | baselines
+            return set(json.load(f).get(state_key, []))
     except Exception:
-        return baselines
+        return set()
 
 
 def save_known_theaters(event_code: str, date: str, theaters: set) -> None:
@@ -313,7 +330,7 @@ def _parse_api_response(resp) -> tuple:
 
 
 async def get_current_theaters(phone_session: AsyncSession, resi_session: AsyncSession, page_url: str, api_url: str) -> tuple:
-    log("  ↳ Routing through Primary Phone Tunnel (Localtonet Phone Data)...")
+    log("  ↳ Routing through Primary Phone Tunnel...")
     status, theaters = await fetch_with_proxy(phone_session, resi_session, api_url, page_url, "PHONE_TUNNEL")
     if status in ("OK", "NOT_LIVE"):
         return status, theaters
@@ -322,21 +339,21 @@ async def get_current_theaters(phone_session: AsyncSession, resi_session: AsyncS
     return await fetch_with_proxy(phone_session, resi_session, api_url, page_url, "RESIDENTIAL")
 
 
-async def process_movie_date(phone_session: AsyncSession, resi_session: AsyncSession, semaphore: asyncio.Semaphore, movie: dict, target_date: str) -> bool:
+async def process_movie_date(phone_session: AsyncSession, resi_session: AsyncSession, semaphore: asyncio.Semaphore, movie: dict, target_date: str, check_count: int, active_code: str) -> bool:
     async with semaphore:
         await asyncio.sleep(random.uniform(0.2, 1.0))
-        page_url, _, api_url = get_urls(movie, target_date)
+        page_url, _, api_url = get_urls(movie, target_date, active_code)
         human_date = datetime.datetime.strptime(target_date, "%Y%m%d").strftime("%B %d, %Y")
-        log(f"   ↳ Auditing Layout Grid: {target_date} ({human_date}) for {movie['name']}")
+        log(f"   ↳ Auditing Layout Grid: {target_date} ({human_date}) for {movie['name']} [Code: {active_code}]")
         
-        is_first_run = is_state_key_missing(movie["code"], target_date)
-        known_theaters = load_known_theaters(movie["code"], target_date)
+        is_first_run = is_state_key_missing(active_code, target_date)
+        known_theaters = load_known_theaters(active_code, target_date)
         status, current_theaters = await get_current_theaters(phone_session, resi_session, page_url, api_url)
 
         if status == "OK":
             new_theaters = current_theaters - known_theaters
             if new_theaters:
-                if is_first_run:
+                if is_first_run and check_count == 1:
                     log(f"      📥 [Silent Init] Cached baseline grid snapshot ({len(current_theaters)} nodes) for {movie['name']}.")
                 else:
                     theater_list = "\n".join(f"• {t}" for t in sorted(new_theaters))
@@ -348,7 +365,7 @@ async def process_movie_date(phone_session: AsyncSession, resi_session: AsyncSes
                         f"👉 <a href='{page_url}'>SECURE SEATS NOW →</a>"
                     )
                     await notify(alert_msg, email_subject=f"🚨 NEW SEATS OPEN FOR {movie['name'].upper()}!")
-                save_known_theaters(movie["code"], target_date, known_theaters | current_theaters)
+                save_known_theaters(active_code, target_date, known_theaters | current_theaters)
             else:
                 log(f"      ↳ Balanced matrix state for {movie['name']} on {target_date}. No structural changes.")
             return True
@@ -366,41 +383,48 @@ async def main_async():
                AsyncSession(impersonate="chrome110", proxy=get_residential_proxy_url()) as resi_session:
                
         log("=" * 60)
-        log(f"🎬 Optimized Persistent Connection Proxy Monitor Active")
-        log(f"   HTTP Keep-Alive enabled. Slicing TLS handshake overhead metrics.")
+        log(f"🎬 Optimized Code-Independent Proxy Monitor Active")
+        log(f"   Dynamic Auto-Discovery Mapping Modules Online.")
         log("=" * 60)
 
-        # 🌟 SPIN UP THE TELEGRAM INCOMING COMMAND THREAD CONCURRENTLY
         asyncio.create_task(telegram_listener())
 
         for movie in MOVIES:
             movie_name = movie["name"]
             dates_to_track = get_dates_to_track(movie)
-            page_url, _, _ = get_urls(movie, dates_to_track[0])
+            page_url, _, _ = get_urls(movie, dates_to_track[0], movie["default_code"])
             readable_dates = ", ".join([datetime.datetime.strptime(d, "%Y%m%d").strftime("%b %d") for d in dates_to_track])
             
             startup_alert = (
-                f"🚀 <b>BMS Optimized Monitor Online!</b>\n\n"
+                f"🚀 <b>BMS Independent Monitor Online!</b>\n\n"
                 f"🎬 <b>Movie:</b> {movie_name}\n"
                 f"📅 <b>Horizon Map:</b> {readable_dates}\n\n"
-                f"💬 <i>Send me 'status' or 'alive' at any time to verify system health and active proxies.</i>\n\n"
                 f"👉 <a href='{page_url}'>OPEN BOOKING PAGE →</a>"
             )
-            await notify(startup_alert, email_subject=f"🚀 BMS Hardcoded Monitor Online: {movie_name}")
+            await notify(startup_alert, email_subject=f"🚀 BMS Independent Monitor Online: {movie_name}")
 
         check_count = 0
         consecutive_failures = 0
         
         while True:
             check_count += 1
-            TOTAL_SWEEPS = check_count # Synchronize state counter for Telegram diagnostic replies
+            TOTAL_SWEEPS = check_count
             log(f"Matrix Sweep Check #{check_count} starting...")
+            
+            # Resolve live active codes dynamically once per movie for this cycle loop
+            resolved_codes = {}
+            for movie in MOVIES:
+                slug = movie["slug"]
+                resolved_codes[slug] = await discover_event_code(phone_session, "hyderabad", slug, movie["default_code"])
+                if resolved_codes[slug] != movie["default_code"]:
+                    log(f"   🎯 Auto-Discovery: Code shift detected for {movie['name']} -> {resolved_codes[slug]}")
             
             semaphore = asyncio.Semaphore(1)  
             tasks = []
             for movie in MOVIES:
+                active_code = resolved_codes[movie["slug"]]
                 for target_date in get_dates_to_track(movie):
-                    tasks.append(process_movie_date(phone_session, resi_session, semaphore, movie, target_date))
+                    tasks.append(process_movie_date(phone_session, resi_session, semaphore, movie, target_date, check_count, active_code))
             
             results = await asyncio.gather(*tasks)
             
