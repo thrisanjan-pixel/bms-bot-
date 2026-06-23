@@ -34,7 +34,7 @@ MOVIES = [
     },
     {
         "name": "Supergirl",
-        "default_code": "ET00501636",      
+        "default_code": "ET00475569",      # 🎯 UPDATED: Set to live code from image_0a2e3f.png as the rock-solid fallback
         "slug": "supergirl",
         "start_date": "20260626",  
         "days_to_track": 3         
@@ -96,9 +96,7 @@ def get_urls(movie: dict, date: str, active_code: str) -> tuple:
     return page_url, info_page_url, api_url
 
 
-# ─── 🛠️ UPGRADED ADVANCED PROXIMITY DISCOVERY SCANNER ────────────────────
 async def discover_event_code(session: AsyncSession, city_slug: str, slug: str, fallback_code: str) -> str:
-    """Scans full page source block matrices to locate event keys near target slugs."""
     url = f"https://in.bookmyshow.com/{city_slug.lower()}/movies"
     cfg = random.choice(HEADER_CONFIGS)
     headers = {
@@ -111,8 +109,6 @@ async def discover_event_code(session: AsyncSession, city_slug: str, slug: str, 
         if resp.status_code == 200:
             text = resp.text
             slug_idx = text.lower().find(slug.lower())
-            
-            # If slug is present anywhere (including JSON blocks), parse the surrounding window zone
             if slug_idx != -1:
                 search_window = text[max(0, slug_idx - 300):min(len(text), slug_idx + 1500)]
                 et_match = re.search(r'(ET[0-9]+)', search_window)
@@ -122,7 +118,6 @@ async def discover_event_code(session: AsyncSession, city_slug: str, slug: str, 
     except Exception:
         pass
     return fallback_code 
-# ──────────────────────────────────────────────────────────────────────────
 
 
 def get_phone_tunnel_url() -> str:
@@ -342,7 +337,6 @@ async def process_movie_date(phone_session: AsyncSession, resi_session: AsyncSes
         if status == "OK":
             new_theaters = current_theaters - known_theaters
             if new_theaters:
-                # 🛠️ FORCED INITIAL ALERT: If tickets are already live when the server fires up, push a summary instead of staying silent!
                 if is_first_run and check_count == 1:
                     theater_list = "\n".join(f"• {t}" for t in sorted(current_theaters))
                     alert_msg = (
@@ -385,7 +379,23 @@ async def main_async():
         log(f"   Dynamic Auto-Discovery Mapping Modules Online.")
         log("=" * 60)
 
+        # Start background update processing threads
         asyncio.create_task(telegram_listener())
+
+        # 🚀 RESTORED STARTUP NOTIFICATION BLOCK
+        for movie in MOVIES:
+            movie_name = movie["name"]
+            dates_to_track = get_dates_to_track(movie)
+            page_url, _, _ = get_urls(movie, dates_to_track[0], movie["default_code"])
+            readable_dates = ", ".join([datetime.datetime.strptime(d, "%Y%m%d").strftime("%b %d") for d in dates_to_track])
+            
+            startup_alert = (
+                f"🚀 <b>BMS Independent Monitor Online!</b>\n\n"
+                f"🎬 <b>Movie:</b> {movie_name}\n"
+                f"📅 <b>Horizon Map:</b> {readable_dates}\n\n"
+                f"👉 <a href='{page_url}'>OPEN BOOKING PAGE →</a>"
+            )
+            await notify(startup_alert, email_subject=f"🚀 BMS Independent Monitor Online: {movie_name}")
 
         check_count = 0
         consecutive_failures = 0
