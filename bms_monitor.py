@@ -24,19 +24,15 @@ EMAIL_TO        = "thrisanjan@gmail.com"
 CITY_CODE  = "HYD"
 BASE_CHECK_INTERVAL = 45  
 
+# 🏛️ STRICT THEATER SHORTCODE FILTER SET
+ALLOWED_THEATERS = {"ALUC", "AMBH"}
+
 MOVIES = [
     {
         "name": "Spider-Man: Brand New Day",
         "default_code": "ET00502600",
         "slug": "spider-man-brand-new-day",
         "start_date": "20260730",  
-        "days_to_track": 3         
-    },
-    {
-        "name": "Supergirl",
-        "default_code": "ET00475569",      # 🎯 UPDATED: Set to live code from image_0a2e3f.png as the rock-solid fallback
-        "slug": "supergirl",
-        "start_date": "20260626",  
         "days_to_track": 3         
     },
     {
@@ -113,8 +109,7 @@ async def discover_event_code(session: AsyncSession, city_slug: str, slug: str, 
                 search_window = text[max(0, slug_idx - 300):min(len(text), slug_idx + 1500)]
                 et_match = re.search(r'(ET[0-9]+)', search_window)
                 if et_match:
-                    detected_code = et_match.group(1).upper()
-                    return detected_code
+                    return et_match.group(1).upper()
     except Exception:
         pass
     return fallback_code 
@@ -301,6 +296,12 @@ def _parse_api_response(resp) -> tuple:
         venues = entry.get("Venues") or entry.get("venues") or [entry]
         for v in venues:
             if not isinstance(v, dict): continue
+            
+            # 🏛️ STAGE FILTER OUT: Skip any venue whose ID doesn't match ALUC or AMBH
+            vcode = (v.get("VenueCode") or v.get("venueCode") or "").strip().upper()
+            if vcode not in ALLOWED_THEATERS:
+                continue
+                
             vname = v.get("VenueName") or v.get("venueName") or v.get("CinemaName") or v.get("name")
             if not vname: continue
             
@@ -340,23 +341,23 @@ async def process_movie_date(phone_session: AsyncSession, resi_session: AsyncSes
                 if is_first_run and check_count == 1:
                     theater_list = "\n".join(f"• {t}" for t in sorted(current_theaters))
                     alert_msg = (
-                        f"📥 <b>BMS CLUSTER ONLINE — CURRENT OPEN TRACKS FOUND!</b>\n\n"
+                        f"📥 <b>BMS TRACKER ONLINE — THEATER TARGET MATCHED!</b>\n\n"
                         f"🎬 <b>{movie['name']}</b>\n"
                         f"📅 Date: <b>{human_date}</b>\n\n"
-                        f"<b>Active Venues Detected:</b>\n{theater_list}\n\n"
+                        f"<b>Open Target Venues:</b>\n{theater_list}\n\n"
                         f"👉 <a href='{page_url}'>SECURE SEATS NOW →</a>"
                     )
-                    await notify(alert_msg, email_subject=f"📥 TRACKER INITIALIZED: {movie['name'].upper()} LIVE")
+                    await notify(alert_msg, email_subject=f"📥 TARGET WATCH ACTIVE: {movie['name'].upper()}")
                 else:
                     theater_list = "\n".join(f"• {t}" for t in sorted(new_theaters))
                     alert_msg = (
-                        f"🚨🎬 <b>NEW CHANNELS OPENED ON {target_date}!</b>\n\n"
+                        f"🚨🎬 <b>TARGET CINEMA OPENED ON {target_date}!</b>\n\n"
                         f"🎬 <b>{movie['name']}</b>\n"
                         f"📅 Date: <b>{human_date}</b>\n\n"
                         f"<b>New Channels:</b>\n{theater_list}\n\n"
                         f"👉 <a href='{page_url}'>SECURE SEATS NOW →</a>"
                     )
-                    await notify(alert_msg, email_subject=f"🚨 NEW SEATS OPEN FOR {movie['name'].upper()}!")
+                    await notify(alert_msg, email_subject=f"🚨 TARGET OPEN FOR {movie['name'].upper()}!")
                 save_known_theaters(active_code, target_date, known_theaters | current_theaters)
             else:
                 log(f"      ↳ Balanced matrix state for {movie['name']} on {target_date}. No structural changes.")
@@ -376,13 +377,12 @@ async def main_async():
                
         log("=" * 60)
         log(f"🎬 Optimized Code-Independent Proxy Monitor Active")
-        log(f"   Dynamic Auto-Discovery Mapping Modules Online.")
+        log(f"   Target Lock Filter: ALLU Cinemas (ALUC) & AMB Cinemas (AMBH)")
         log("=" * 60)
 
-        # Start background update processing threads
         asyncio.create_task(telegram_listener())
 
-        # 🚀 RESTORED STARTUP NOTIFICATION BLOCK
+        # Instant startup initialization check notifications
         for movie in MOVIES:
             movie_name = movie["name"]
             dates_to_track = get_dates_to_track(movie)
@@ -390,12 +390,13 @@ async def main_async():
             readable_dates = ", ".join([datetime.datetime.strptime(d, "%Y%m%d").strftime("%b %d") for d in dates_to_track])
             
             startup_alert = (
-                f"🚀 <b>BMS Independent Monitor Online!</b>\n\n"
+                f"🚀 <b>BMS Strict Target Monitor Online!</b>\n\n"
                 f"🎬 <b>Movie:</b> {movie_name}\n"
-                f"📅 <b>Horizon Map:</b> {readable_dates}\n\n"
+                f"📅 <b>Horizon Map:</b> {readable_dates}\n"
+                f"🏛️ <b>Cinemas:</b> ALLU Kokapet & AMB Gachibowli Only\n\n"
                 f"👉 <a href='{page_url}'>OPEN BOOKING PAGE →</a>"
             )
-            await notify(startup_alert, email_subject=f"🚀 BMS Independent Monitor Online: {movie_name}")
+            await notify(startup_alert, email_subject=f"🚀 Target Watch Active: {movie_name}")
 
         check_count = 0
         consecutive_failures = 0
